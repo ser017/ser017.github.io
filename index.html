@@ -6,10 +6,26 @@
 <link rel="stylesheet" type="text/css" href="YTPlayer.min.css">
 <script src="YTPlayer.min.js"></script>
 <link href="https://fonts.googleapis.com/css?family=Exo+2" rel="stylesheet">
+<style>#elements div {
+  display: none;
+}</style>
 </head>
 <body style="background-color: #181818">
-<div id="bgndVideo" class="player" data-property="{videoURL:'ALZHF5UqnU4', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
-<script>
+
+<div id="elements">
+  <div id="bgndVideo" class="player" data-property="{videoURL:'ALZHF5UqnU4', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'6Dh-RL__uN4', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'jATOZhxX1CY', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'JePnQ1gSagc', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'LDU_Txk06tM', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'8X2kIfS6fb8', containment:'body', autoPlay:true, mute:false, loop:true, startAt:19, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+</div>
+
+<script>$('#elements div').each(function() {
+	var divs = $('#elements div').get();
+	$(divs.splice(Math.random()*divs.length|0,1)).prependTo('#elements').show();
+});
+</script>
 function praiseTheSun(e){
 	e.style.display = 'none';
 	jQuery("#maincontainer").display = '';
