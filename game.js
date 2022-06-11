@@ -3,11 +3,11 @@
  */
 /* eslint-disable no-console */
 
-const TOKEN = process.env.TELEGRAM_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
-const gameName = process.env.TELEGRAM_GAMENAME || 'YOUR_TELEGRAM_GAMENAME';
+const TOKEN = '5552556427:AAG4R6O727Kb3fHUWnm__bmN8OzjpzduYK4' || 'YOUR_TELEGRAM_BOT_TOKEN';
+const gameName = '0' || 'YOUR_TELEGRAM_GAMENAME';
 // Specify '0' to use ngrok i.e. localhost tunneling
-let url = process.env.URL || 'https://<PUBLIC-URL>';
-const port = process.env.PORT || 8080;
+let url = 'https://ser017.github.io' || 'https://<PUBLIC-URL>';
+const port = 8080 || 8080;
 
 const TelegramBot = require('../..');
 const express = require('express');
