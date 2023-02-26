@@ -40,11 +40,11 @@ iframe {
 	background-size: cover;
 }
 .travel{
-	background:url('./img/palma6.png') no-repeat 0px 0px;
+	background:url('./img/palma7.png') no-repeat 0px 0px;
 	background-size: cover;
 }
 .travel:hover{
-	background:url('./img/palma6.png') no-repeat -70px 0px;
+	background:url('./img/palma7.png') no-repeat -70px 0px;
 	background-size: cover;
 }
 .telegram{
