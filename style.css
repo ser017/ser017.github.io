@@ -39,6 +39,14 @@ iframe {
 	background:url('./img/csteam.png') no-repeat -70px 0px;
 	background-size: cover;
 }
+.travel{
+	background:url('./img/palma.png') no-repeat 0px 0px;
+	background-size: cover;
+}
+.travel:hover{
+	background:url('./img/palma.png') no-repeat -70px 0px;
+	background-size: cover;
+}
 .telegram{
     background:url('./img/ctelegram2.png') no-repeat 0px 0px;
     background-size: cover;
