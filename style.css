@@ -56,11 +56,11 @@ iframe {
     background-size: cover;
 }
 .github{
-	background:url('./img/cgithub.png') no-repeat 0px 0px;
+	background:url('./img/csteam.png') no-repeat 0px 0px;
 	background-size: cover;
 }
 .github:hover{
-	background:url('./img/cgithub.png') no-repeat -70px 0px;
+	background:url('./img/csteam.png') no-repeat -70px 0px;
 	background-size: cover;
 }
 .vk{
