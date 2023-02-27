@@ -39,6 +39,14 @@ iframe {
 	background:url('./img/csteam.png') no-repeat -70px 0px;
 	background-size: cover;
 }
+.merch{
+	background:url('./img/merch.png') no-repeat 0px 0px;
+	background-size: cover;
+}
+.merch:hover{
+	background:url('./img/merch.png') no-repeat -70px 0px;
+	background-size: cover;
+}
 .travel{
 	background:url('./img/palma11.png') no-repeat 0px 0px;
 	background-size: cover;
