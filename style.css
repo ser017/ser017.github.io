@@ -40,11 +40,11 @@ iframe {
 	background-size: cover;
 }
 .merch{
-	background:url('./img/merch3.png') no-repeat 0px 0px;
+	background:url('./img/merch4.png') no-repeat 0px 0px;
 	background-size: cover;
 }
 .merch:hover{
-	background:url('./img/merch3.png') no-repeat -70px 0px;
+	background:url('./img/merch4.png') no-repeat -70px 0px;
 	background-size: cover;
 }
 .travel{
