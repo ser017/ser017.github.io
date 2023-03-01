@@ -32,7 +32,7 @@ body, html {
 
 .goods{
 	background-color: rgba(55, 55, 55, 0.5); // потом закомментить
-
+	background-color: white; // чтобы работали ссылки
 	position: relative;
 	z-index: 10000;
 	//height: 55vh;
