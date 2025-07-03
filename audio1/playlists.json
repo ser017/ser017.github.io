@@ -1,0 +1,62 @@
+[
+  {
+    "title": "Все треки",
+    "author": "Ser017",
+    "cover": "playlists/img/note.png",
+    "list": "playlist0"
+  },
+  {
+    "title": "The Bones Of What You Believe",
+    "author": "CHVRCHES",
+    "cover": "playlists/img/The_Bones_of_What_You_Believe.png",
+    "list": "playlist1"
+  },
+  {
+    "title": "Love Is Dead",
+    "author": "CHVRCHES",
+    "cover": "playlists/img/loveisdead.jpg",
+    "list": "playlist2"
+  },
+  {
+    "title": "Every Open Eye",
+    "author": "CHVRCHES",
+    "cover": "playlists/img/everyopeneye.jpg",
+    "list": "playlist3"
+  },
+  {
+    "title": "Screen Violence",
+    "author": "CHVRCHES",
+    "cover": "playlists/img/screenviolence.jpg",
+    "list": "playlist4"
+  },
+  {
+    "title": "Death Stranding: Timefall",
+    "author": "Death Stranding",
+    "cover": "playlists/img/Death_Stranding-Timefall.jpg",
+    "list": "playlist5"
+  },
+  {
+    "title": "Death Stranding - Songs from the Video Game",
+    "author": "Death Stranding",
+    "cover": "playlists/img/dssongs.jpg",
+    "list": "playlist6"
+  },
+  {
+    "title": "Hansa Session EP",
+    "author": "CHVRCHES",
+    "cover": "playlists/img/hansa.jpg",
+    "list": "playlist8"
+  },
+  {
+    "title": "CHVRCHES Covers",
+    "author": "CHVRCHES",
+    "cover": "playlists/img/covers.jpg",
+    "list": "playlist9"
+  },
+  {
+    "title": "Smoke + Mirrors",
+    "author": "Imagine Dragons",
+    "cover": "playlists/img/smokeand.jpg",
+    "list": "playlist7"
+  }
+]
