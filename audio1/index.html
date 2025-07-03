@@ -80,7 +80,7 @@ fetch('links.json')
   .then(res => res.json())
   .then(links => {
     linksData = links;
-    fetch('playlists.json')
+    fetch('playlists/playlists.json')
       .then(res => res.json())
       .then(playlists => {
         playlistsData = playlists;
