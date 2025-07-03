@@ -149,6 +149,23 @@ function renderTracks(tracks) {
     trackDiv.className = 'track';
     trackDiv.textContent = `${track.artist} — ${track.title}`;
     trackDiv.onclick = () => {
+      // Если клик по уже играющему треку — ставим на паузу/воспроизводим!
+      if (
+        playingTracks.length &&
+        playingTracks[playingIndex] &&
+        filteredTracks[index] &&
+        playingTracks[playingIndex].name === filteredTracks[index].name
+      ) {
+        if (audio.paused) {
+          audio.play();
+          playPauseBtn.textContent = "⏸️";
+        } else {
+          audio.pause();
+          playPauseBtn.textContent = "▶️";
+        }
+        return;
+      }
+      // Если клик по другому треку — запускаем очередь с него
       playingTracks = filteredTracks.slice();
       playingIndex = index;
       playingMode = "order";
@@ -156,6 +173,7 @@ function renderTracks(tracks) {
       playingShufflePos = 0;
       playFromPlaying();
     };
+
     trackListDiv.appendChild(trackDiv);
   });
   updateShuffleAboveBtn();
