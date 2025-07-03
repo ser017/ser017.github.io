@@ -125,7 +125,7 @@ function renderPlaylists(playlists) {
   const showAllBtn = document.getElementById('show-all-playlists');
   if (showAllBtn) {
     showAllBtn.style.display = playlists.length > maxVisible ? '' : 'none';
-    showAllBtn.onclick = () => window.location.href = '/playlists.html';
+    showAllBtn.onclick = () => window.location.href = 'playlists/';
   }
 }
   
