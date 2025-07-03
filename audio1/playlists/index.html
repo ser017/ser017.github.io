@@ -30,7 +30,7 @@
           `;
           // Переход на главную с нужным плейлистом в параметре URL
           div.addEventListener('click', () => {
-            window.location.href = `index.html?playlist=${encodeURIComponent(pl.list)}`;
+            window.location.href = `../index.html?playlist=${encodeURIComponent(pl.list)}`;
           });
           playlistsList.appendChild(div);
         });
