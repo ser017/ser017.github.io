@@ -130,6 +130,29 @@
       }
     }
 
+    /* === MOBILE FIXES === */
+    @media ((hover:none) and (pointer:coarse)) , (max-width:900px) {
+
+      /* 1) Реальный запас под высокий нижний плеер */
+      :root { --bp-safe: 220px; } /* подгони под свою высоту панели */
+
+      /* запас для страницы + safe area */
+      body { padding-bottom: calc(var(--bp-safe) + env(safe-area-inset-bottom)) !important; }
+
+      /* если скроллится основной контент — тоже добавим запас */
+      main, #track-list {
+        padding-bottom: calc(var(--bp-safe) + 16px + env(safe-area-inset-bottom));
+      }
+
+      /* 2) Шапка должна быть чёрной во всю ширину
+            Причина «полосок» — паддинги у .main-card на мобилке. Убираем их. */
+      .main-card { padding-left: 0; padding-right: 0; }
+
+      /* добавим горизонтальные поля контенту вместо .main-card */
+      header .header-row { padding-left: 12px; padding-right: 12px; }
+      .playlists-section { padding-left: 12px; padding-right: 12px; }
+      main { padding-left: 12px; padding-right: 12px; }
+    }
 
 
 
