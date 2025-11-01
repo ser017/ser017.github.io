@@ -134,7 +134,7 @@
     @media ((hover:none) and (pointer:coarse)) , (max-width:900px) {
 
       /* 1) Реальный запас под высокий нижний плеер */
-      :root { --bp-safe: 220px; } /* подгони под свою высоту панели */
+      :root { --bp-safe: 60px; } /* подгони под свою высоту панели */
 
       /* запас для страницы + safe area */
       body { padding-bottom: calc(var(--bp-safe) + env(safe-area-inset-bottom)) !important; }
@@ -632,4 +632,5 @@ if ('mediaSession' in navigator) {
 </script>
 </body>
 </html>
+
 
