@@ -281,16 +281,20 @@ main {
 }
 
 #show-all-playlists {
-  background: #111 !important;
+  background: #222 !important;
   color: #fff !important;
-  border: 1px solid #222 !important;
-  border-radius: 10px;
-  padding: 8px 14px;
-  font-weight: 500;
+  border: none !important;
+  border-radius: 10px !important;
+  padding: 10px 22px !important;
+  font-size: 1.05rem !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 7px #0003 !important;
+  transition: background 0.15s, box-shadow 0.15s !important;
 }
 
-#show-all-playlists:hover {
-  background: #000 !important;
-  border-color: #444 !important;
+#show-all-playlists:active,
+#show-all-playlists:focus {
+  background: #1a1a1a !important;
 }
+
 
