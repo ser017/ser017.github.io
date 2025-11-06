@@ -1,0 +1,33 @@
+{# Если нет обложки — добавим класс no-cover, чтобы сжать сетку в одну колонку #}
+{% set hasCover = post.data.cover %}
+<div class="card{% if not hasCover %} no-cover{% endif %}">
+
+  {# Фото кликабельно (НЕ завязано на hero) #}
+  {% if hasCover %}
+    <a href="{{ post.url }}" class="card-media-link" aria-label="{{ post.data.title }}">
+      <img src="{{ post.data.cover | url }}" alt="{{ post.data.title }}">
+    </a>
+  {% endif %}
+
+  <div class="meta">
+    {# Заголовок + описание кликабельны блоком #}
+    <a href="{{ post.url }}" class="card-content-link" aria-label="{{ post.data.title }}">
+      <h2 class="title">{{ post.data.title }}</h2>
+      {% set teaser = post.data.excerpt or (post.templateContent | striptags | truncate(180, true, '…')) %}
+      {% if teaser %}
+        <p class="excerpt">{{ teaser }}</p>
+      {% endif %}
+    </a>
+
+    <div class="bottom">
+      <div class="tags">
+        {% for tag in post.data.tags or [] %}
+          {% if tag != "posts" %}
+            <a class="tag" href="/tags/{{ tag | slug }}/">{{ tag }}</a>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <div class="read-time">{{ post.date | readableDate }}</div>
+    </div>
+  </div>
+</div>
