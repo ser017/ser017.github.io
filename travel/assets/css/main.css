@@ -322,3 +322,96 @@ a:hover{ text-decoration: underline; }
 .card-content-link:hover .excerpt {
   text-decoration: none;
 }
+
+/* ====== РЕЗЮМЕ СТИЛЬ ====== */
+.section {
+  display: grid;
+  grid-template-columns: 160px 1fr; /* левая колонка (заголовок) + правая */
+  gap: 30px;
+  padding: 20px 0;
+  font-family: "Arial", "Helvetica Neue", sans-serif;
+  color: #222;
+}
+
+.section:first-of-type {
+  border-top: none;
+}
+
+.section .title {
+  font-weight: bold;
+  font-size: 16px;
+  white-space: nowrap;
+  color: #000;
+}
+
+.section .content {
+  border-left: 1px solid #ddd; /* вертикальные линии */
+  padding-left: 30px;
+  position: relative;
+}
+
+.section .note {
+  float: right;
+  font-style: italic;
+  font-size: 14px;
+  color: #888;
+  margin-top: -4px;
+  margin-left: 10px;
+}
+
+.section ul {
+  list-style-type: disc;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.section li {
+  margin-bottom: 6px;
+  line-height: 1.6;
+}
+
+.section em {
+  font-style: italic;
+  color: #555;
+}
+
+
+.section a {
+  color: inherit;
+  text-decoration: none ; /* или underline */
+}
+.section a:hover {
+  text-decoration: underline;
+}
+
+
+/* ====== адаптив под узкий экран ====== */
+@media (max-width: 700px) {
+  .section {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .section .content {
+    border-left: none;
+    padding-left: 0;
+  }
+  .section .note {
+    float: none;
+    display: block;
+    margin: 0 0 8px 0;
+    text-align: right;
+  }
+}
+
+.leftspace {
+  line-height: 0.9;
+}
+
+.leftspace a {
+  color: inherit;
+  text-decoration: none ; /* или underline */
+}
+
+.leftspace a:hover {
+  text-decoration: underline;
+}
