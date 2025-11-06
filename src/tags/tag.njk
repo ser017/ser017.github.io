@@ -1,0 +1,18 @@
+---
+pagination:
+  data: collections.tagList
+  size: 1
+  alias: tag
+permalink: "tags/{{ tag | slug }}/index.html"
+layout: layout.njk
+eleventyComputed:
+  title: "Тег: {{ tag }}"
+---
+<section>
+  <h1>Тег: {{ tag }}</h1>
+  <div class="list">
+    {% for post in collections[tag] | reverse %}
+      {% include "post-card.njk" %}
+    {% endfor %}
+  </div>
+</section>
