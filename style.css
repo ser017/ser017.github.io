@@ -41,19 +41,19 @@ iframe {
 	background-size: cover;
 }
 .audio{
-	background:url('./img/note.png') no-repeat 0px 0px;
+	background:url('./img/note1.png') no-repeat 0px 0px;
 	background-size: cover;
 }
 .audio:hover{
-	background:url('./img/note.png') no-repeat -70px 0px;
+	background:url('./img/note1.png') no-repeat -70px 0px;
 	background-size: cover;
 }
 .merch{
-	background:url('./img/store2.png') no-repeat 0px 0px;
+	background:url('./img/store.png') no-repeat 0px 0px;
 	background-size: cover;
 }
 .merch:hover{
-	background:url('./img/store2.png') no-repeat -70px 0px;
+	background:url('./img/store.png') no-repeat -70px 0px;
 	background-size: cover;
 }
 
