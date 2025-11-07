@@ -31,12 +31,21 @@ iframe {
 	margin-left: 5px;
     margin-right: 5px;
 }
+
+.travel{
+	background:url('./img/palma11.png') no-repeat 0px 0px;
+	background-size: cover;
+}
+.travel:hover{
+	background:url('./img/palma11.png') no-repeat -70px 0px;
+	background-size: cover;
+}
 .audio{
-	background:url('./img/csteam.png') no-repeat 0px 0px;
+	background:url('./img/note.png') no-repeat 0px 0px;
 	background-size: cover;
 }
 .audio:hover{
-	background:url('./img/csteam.png') no-repeat -70px 0px;
+	background:url('./img/note.png') no-repeat -70px 0px;
 	background-size: cover;
 }
 .merch{
@@ -47,14 +56,7 @@ iframe {
 	background:url('./img/store.png') no-repeat -70px 0px;
 	background-size: cover;
 }
-.travel{
-	background:url('./img/palma11.png') no-repeat 0px 0px;
-	background-size: cover;
-}
-.travel:hover{
-	background:url('./img/palma11.png') no-repeat -70px 0px;
-	background-size: cover;
-}
+
 
 .links{
     position: fixed;
