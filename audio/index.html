@@ -183,7 +183,7 @@
       </div>
 
       <div id="now-playing" class="now-playing">Сейчас ничего не играет</div>
-      <audio id="audio-element" preload="auto" playsinline></audio>
+      <audio id="audio-element" preload="auto" playsinline autoplay></audio>
     </header>
 
     <!-- Плейлисты -->
@@ -238,7 +238,11 @@ let seekingBP = false;
 let pendingAutoplay = false;   // нужно автозапустить, но мобилка заблокировала
 let playRetryTimer = null;     // watchdog-повтор
 
-const audio = document.getElementById("audio-element");
+let awaitingAutostart = false;
+
+let audio = document.getElementById("audio-element");
+bindAudioEvents(audio);
+
 const nowPlaying = document.getElementById("now-playing");
 
 // Верх
@@ -261,12 +265,102 @@ const bottomRepeatBtn = document.getElementById("bottom-repeat");
 const bpSeek = document.getElementById("bp-seek");
 const bpTimeLeft = document.getElementById("bp-time-left");
 const bpTimeRight = document.getElementById("bp-time-right");
+const bpTitle = document.getElementById("bp-title"); // ← ДОБАВЬ ЭТО
 
 // UI
 const trackListDiv = document.getElementById("track-list");
 const shuffleAboveBtn = document.getElementById('shuffle-above-tracks');
 const searchInput = document.getElementById("search-input");
+  
 
+// --- безопасные заглушки, чтобы ничего не падало ---
+function setPlayIcon(paused){ try{
+  const el1 = document.getElementById('play-pause');
+  const el2 = document.getElementById('bottom-play-pause');
+  if (el1) el1.textContent = paused ? '▶️' : '⏸️';
+  if (el2) el2.textContent = paused ? '▶️' : '⏸️';
+} catch{} }
+
+function tryPlayWithFallback(){
+  try {
+    const p = audio.play();
+    if (p && typeof p.then==='function') {
+      p.then(()=>setPlayIcon(false)).catch(()=>setPlayIcon(true));
+    } else {
+      setPlayIcon(false);
+    }
+  } catch { setPlayIcon(true); }
+}
+
+function reflectShuffleUI(){
+  const on = (typeof playingMode!=='undefined' && playingMode==='shuffle');
+  ['top-shuffle','bottom-shuffle','shuffle-above-tracks'].forEach(id=>{
+    const b = document.getElementById(id);
+    if (b) b.classList.toggle('active', on);
+  });
+}
+
+function buildShuffleFromCurrent(currIndex){
+  // если уже есть порядок — пересоберём
+  if (!Array.isArray(playingTracks) || !playingTracks.length) return;
+  playingShuffleOrder = playingTracks.map((_,i)=>i).sort(()=>Math.random()-0.5);
+  const pos = playingShuffleOrder.indexOf(currIndex);
+  playingShufflePos = pos >= 0 ? pos : 0;
+}
+
+
+
+function updateMediaSession(track) {
+  if (!('mediaSession' in navigator) || !track) return;
+  try {
+    const art = track.cover || 'favicon.png'; // поставь свой путь к обложке, если есть
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title || '',
+      artist: track.artist || '',
+      album: (window.currentPlaylistTitle || ''), // можешь заполнить при выборе плейлиста
+      artwork: [
+        { src: art, sizes: '96x96',   type: 'image/png' },
+        { src: art, sizes: '192x192', type: 'image/png' },
+        { src: art, sizes: '512x512', type: 'image/png' }
+      ]
+    });
+    navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
+
+    // Позиция (не обязательно, но красиво обновляет прогресс)
+    if ('setPositionState' in navigator.mediaSession) {
+      navigator.mediaSession.setPositionState({
+        duration: isFinite(audio.duration) ? audio.duration : 0,
+        position: isFinite(audio.currentTime) ? audio.currentTime : 0,
+        playbackRate: audio.playbackRate || 1
+      });
+    }
+  } catch (_) {}
+}
+
+// поддержка аппаратных кнопок (если ещё не стоит)
+if ('mediaSession' in navigator) {
+  try {
+    navigator.mediaSession.setActionHandler('previoustrack', () => typeof goPrev === 'function' && goPrev());
+    navigator.mediaSession.setActionHandler('nexttrack',     () => typeof goNext === 'function' && goNext());
+    navigator.mediaSession.setActionHandler('play',  () => audio.play().catch(()=>{}));
+    navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+  } catch (_) {}
+}
+
+// лёгкое обновление позиции
+audio.addEventListener('timeupdate', () => {
+  if (!('mediaSession' in navigator)) return;
+  if ('setPositionState' in navigator.mediaSession) {
+    navigator.mediaSession.setPositionState({
+      duration: isFinite(audio.duration) ? audio.duration : 0,
+      position: isFinite(audio.currentTime) ? audio.currentTime : 0,
+      playbackRate: audio.playbackRate || 1
+    });
+  }
+});
+
+
+  
 function getQueryParam(name) {
   const urlParams = new URLSearchParams(window.location.search);
   return urlParams.get(name);
@@ -321,6 +415,92 @@ function renderPlaylists(playlists) {
     showAllBtn.onclick = () => window.location.href = 'playlists/';
   }
 }
+
+function computeNextIndex() {
+  if (playingMode === "shuffle") {
+    if (playingShufflePos + 1 < playingShuffleOrder.length) {
+      return playingShuffleOrder[playingShufflePos + 1];
+    }
+  } else {
+    if (playingIndex + 1 < playingTracks.length) {
+      return playingIndex + 1;
+    }
+  }
+  return -1;
+}
+
+
+
+function endedAutoAdvance() {
+  if (audio.loop) return;
+
+  // 1) вычисляем следующий индекс и сдвигаем указатели
+  let nextIdx = -1;
+  if (playingMode === "shuffle") {
+    if (playingShufflePos + 1 < playingShuffleOrder.length) {
+      playingShufflePos++;
+      nextIdx = playingShuffleOrder[playingShufflePos];
+    }
+  } else if (playingIndex + 1 < playingTracks.length) {
+    nextIdx = playingIndex + 1;
+  }
+  if (nextIdx === -1) return; // очередь кончилась
+
+  playingIndex = nextIdx;
+  const tr = playingTracks[playingIndex];
+  updateMediaSession(tr);
+  const src = getTrackLinkByName(tr.name);
+  if (!src) return;
+
+  // 2) Готовим следующий трек без явного play()
+  awaitingAutostart = true;
+  audio.autoplay = true;              // страховка
+  audio.src = src;
+  audio.currentTime = 0;
+  audio.load();                       // в фоне должен сам стартовать
+
+  // 3) UI и Media Session сразу обновляем
+  nowPlaying && (nowPlaying.textContent = `Сейчас играет: ${tr.artist} — ${tr.title}`);
+  typeof bpTitle !== 'undefined' && bpTitle && (bpTitle.textContent = `${tr.artist} — ${tr.title}`);
+  if (window._updateTrackMetadata) {
+    _updateTrackMetadata({
+      title: tr.title, artist: tr.artist,
+      album: tr.album || '', artwork: tr.cover || 'favicon.png'
+    });
+  }
+  highlightCurrentPlaying();
+
+  // 4) Если вкладка видима, дадим мягкий «пинок», если autoplay не сработал
+  setTimeout(() => {
+    if (document.visibilityState === 'visible' && awaitingAutostart && audio.paused) {
+      audio.play().catch(()=>{ /* ок, оставим до жеста */ });
+    }
+  }, 600);
+}
+
+
+
+
+function bindAudioEvents(a) {
+  a.onloadedmetadata = () => {
+    seekbar && (seekbar.max = a.duration || 0);
+    currentTimeSpan && (currentTimeSpan.textContent = "0:00");
+    if (bpSeek)  bpSeek.max = a.duration || 0, bpSeek.value = 0;
+    if (bpTimeLeft)  bpTimeLeft.textContent  = "0:00";
+    if (bpTimeRight) bpTimeRight.textContent = "-" + formatTime(a.duration||0);
+  };
+  a.ontimeupdate = () => {
+    seekbar && (seekbar.value = a.currentTime);
+    currentTimeSpan && (currentTimeSpan.textContent = formatTime(a.currentTime));
+    if (bpSeek) bpSeek.value = a.currentTime;
+    if (bpTimeLeft)  bpTimeLeft.textContent  = formatTime(a.currentTime);
+    if (bpTimeRight) bpTimeRight.textContent = "-" + formatTime(Math.max(0,(a.duration||0)-a.currentTime));
+  };
+  a.onstalled = () => { if (!a.paused) a.play().catch(()=>{}); };
+  a.onended = endedAutoAdvance;   // ← тут наш единственный обработчик
+}
+
+
 
 function filterTracksByPlaylist(playlist) {
   const listFolder = playlist.list;
@@ -431,69 +611,62 @@ audio.addEventListener('waiting', () => {
 
 
 
-function playFromPlaying() {
+
+
+function playFromPlaying(resumeTime = null, opts = {}) {
   if (playingIndex < 0 || playingIndex >= playingTracks.length) return;
 
   const track = playingTracks[playingIndex];
   const audioSrc = getTrackLinkByName(track.name);
   if (!audioSrc) {
-    nowPlaying.textContent = "Ссылка на трек не найдена";
-    const bpTitle = document.getElementById("bp-title");
-    if (bpTitle) bpTitle.textContent = "";
-    setPlayIcon(true);
+    const np = document.getElementById('now-playing');
+    if (np) np.textContent = 'Ссылка на трек не найдена';
     return;
   }
 
-  // Жёстко сбрасываем, чтобы мобилки не «залипали» на старом источнике
-  if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
-  pendingAutoplay = false;
+  const skipReload = opts && opts.skipReload === true;
+  // Если просили НЕ перезагружать и источник не меняется — продолжим с того же места
+  if (skipReload && audio.src && (audio.src === audioSrc || audio.src.endsWith(audioSrc))) {
+    if (resumeTime != null && isFinite(resumeTime)) {
+      try { audio.currentTime = resumeTime; } catch {}
+    }
+    const np = document.getElementById('now-playing');
+    if (np) np.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
+    const bpTitle = document.getElementById('bp-title');
+    if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
 
-  audio.pause();
+    // ДОБАВЬ:
+    updateMediaSession(track);
+
+    if (audio.paused) { audio.play().catch(()=>{}); }
+    if (typeof highlightCurrentPlaying === 'function') highlightCurrentPlaying();
+    return;
+  }
+
+  // Обычный запуск (когда реально меняем трек/нужно перезагрузить)
+  try { audio.pause(); } catch {}
   audio.src = audioSrc;
-  audio.currentTime = 0;
-  // Явно перезагружаем метаданные/буфер
   audio.load();
 
-  nowPlaying.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
-  const bpTitle = document.getElementById("bp-title");
+  const np = document.getElementById('now-playing');
+  if (np) np.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
+  const bpTitle = document.getElementById('bp-title');
   if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
 
-  // Media Session (оставляю как у тебя)
-  if (window._updateTrackMetadata) {
-    window._updateTrackMetadata({
-      title: track.title,
-      artist: track.artist,
-      album: track.album || '',
-      artwork: track.cover || 'favicon.png'
-    });
-  }
+  updateMediaSession(track);
 
-  // Стартуем с fallback’ами
-  tryPlayWithFallback();
-  highlightCurrentPlaying();
-  updateNextPreload();
+  if (resumeTime != null && isFinite(resumeTime)) {
+    try { audio.currentTime = resumeTime; } catch {}
+  } else {
+    try { audio.currentTime = 0; } catch {}
+  }
+  audio.play().catch(()=>{});
+  if (typeof highlightCurrentPlaying === 'function') highlightCurrentPlaying();
 }
 
 
-let nextAudio = null;
-function updateNextPreload() {
-  let nextIndex = -1;
-  if (playingMode === "shuffle" && playingShuffleOrder && playingShufflePos + 1 < playingShuffleOrder.length) {
-    nextIndex = playingShuffleOrder[playingShufflePos + 1];
-  } else if (playingMode === "order" && playingIndex + 1 < playingTracks.length) {
-    nextIndex = playingIndex + 1;
-  }
-  if (nextIndex >= 0 && nextIndex < playingTracks.length) {
-    const nextTrack = playingTracks[nextIndex];
-    const nextSrc = getTrackLinkByName(nextTrack.name);
-    if (nextSrc) {
-      if (nextAudio) nextAudio.src = "";
-      nextAudio = new Audio();
-      nextAudio.src = nextSrc;
-      nextAudio.preload = "auto";
-    }
-  }
-}
+
+
 
 function highlightCurrentPlaying() {
   const trackDivs = document.querySelectorAll('#track-list .track');
@@ -546,18 +719,34 @@ function goPrev() {
   }
   playFromPlaying();
 }
+
 function goNext() {
+  let nextIdx = -1;
   if (playingMode === "shuffle") {
     if (playingShufflePos + 1 < playingShuffleOrder.length) {
       playingShufflePos++;
-      playingIndex = playingShuffleOrder[playingShufflePos];
-    } else return;
-  } else {
-    if (playingIndex + 1 < playingTracks.length) playingIndex++;
-    else return;
+      nextIdx = playingShuffleOrder[playingShufflePos];
+    }
+  } else if (playingIndex + 1 < playingTracks.length) {
+    nextIdx = playingIndex + 1;
   }
-  playFromPlaying();
+  if (nextIdx === -1) return;
+
+  playingIndex = nextIdx;
+  // это ручной клик — можно вызывать нормальный запуск
+  playFromPlaying(0);
 }
+
+
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && awaitingAutostart && audio.paused) {
+    awaitingAutostart = false;
+    audio.play().catch(()=>{ /* пользователь ткнёт сам */ });
+  }
+});
+
+
 prevBtn.onclick = goPrev; nextBtn.onclick = goNext;
 bottomPrevBtn.onclick = goPrev; bottomNextBtn.onclick = goNext;
 
@@ -593,7 +782,12 @@ bpSeek.addEventListener('change', (e)=>{ audio.currentTime = e.target.valueAsNum
 
 audio.addEventListener('play', ()=>setPlayIcon(false));
 audio.addEventListener('pause', ()=>setPlayIcon(true));
-audio.addEventListener('ended', ()=>{ if (!audio.loop) goNext(); });
+
+
+
+
+
+
 
 /* ===== SHUFFLE / REPEAT — общая логика для верхних и нижних кнопок ===== */
 function setShuffle(on) {
@@ -624,44 +818,41 @@ function reflectRepeatUI(){
 }
 
 /* клики — низ */
-bottomShuffleBtn.onclick = () => {
-  if (!filteredTracks.length) return; // нечего мешать
+bottomShuffleBtn && (bottomShuffleBtn.onclick = () => {
+  if (!filteredTracks || !filteredTracks.length) return;
 
-  const turningOn = (playingMode !== "shuffle");
-  const resume = (!Number.isNaN(audio.currentTime)) ? audio.currentTime : 0;
+  const turningOn = (playingMode !== 'shuffle');
+  const currentId = (playingTracks[playingIndex] && playingTracks[playingIndex].name) ? playingTracks[playingIndex].name : null;
+  const resume = isFinite(audio.currentTime) ? audio.currentTime : 0;
 
   if (turningOn) {
-    // если очередь ещё не создана — создаём из видимых треков
     if (!playingTracks.length) {
       playingTracks = filteredTracks.slice();
-      // СЛУЧАЙНЫЙ стартовый трек (а не первый)
       playingIndex = Math.floor(Math.random() * playingTracks.length);
     }
-    // включаем шаффл, якорим на текущем треке
-    setShuffle(true); // внутри построит playingShuffleOrder с учётом playingIndex
-    // ставим указатель на позицию текущего трека в шаффл-очереди
-    const pos = playingShuffleOrder.indexOf(playingIndex);
-    playingShufflePos = (pos >= 0) ? pos : 0;
-    playingIndex = playingShuffleOrder[playingShufflePos];
+    buildShuffleFromCurrent(playingIndex);
+    playingMode = 'shuffle';
 
-    playFromPlaying(resume);
+    // НЕ перезагружаем источник — продолжаем с того же места
+    playFromPlaying(resume, { skipReload: true });
   } else {
-    // выключаем шаффл — оставляем тот же трек и позицию
-    const currentId = (playingTracks[playingIndex] && playingTracks[playingIndex].name) ? playingTracks[playingIndex].name : null;
-    setShuffle(false); // режим order
+    playingMode = 'order';
     if (currentId) {
       const idx = playingTracks.findIndex(t => t.name === currentId);
       if (idx !== -1) playingIndex = idx;
     }
-    playFromPlaying(resume);
+    playFromPlaying(resume, { skipReload: true });
   }
-};
+  reflectShuffleUI();
+});
+
 
 bottomRepeatBtn.onclick = () => { audio.loop = !audio.loop; reflectRepeatUI(); };
 
 /* клики — верх (делают то же) */
 topShuffleBtn.onclick = () => bottomShuffleBtn.click();
-topRepeatBtn.onclick  = () => bottomRepeatBtn.click();
+topShuffleBtn && (topShuffleBtn.onclick = () => bottomShuffleBtn.click());
+
 
 /* первичная синхронизация */
 reflectShuffleUI(); reflectRepeatUI();
