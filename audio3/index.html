@@ -162,7 +162,7 @@
   <div class="main-card">
     <header>
       <div class="header-row">
-        <h1>Audio2</h1>
+        <h1>Audio3</h1>
         <div class="search-container">
           <input id="search-input" type="text" placeholder="Поиск музыки..." autocomplete="off" />
         </div>
@@ -183,7 +183,7 @@
       </div>
 
       <div id="now-playing" class="now-playing">Сейчас ничего не играет</div>
-      <audio id="audio-element" preload="auto" playsinline></audio>
+      <audio id="audio-element" preload="auto" playsinline autoplay></audio>
     </header>
 
     <!-- Плейлисты -->
@@ -327,6 +327,21 @@ function renderPlaylists(playlists) {
   }
 }
 
+function computeNextIndex() {
+  if (playingMode === "shuffle") {
+    if (playingShufflePos + 1 < playingShuffleOrder.length) {
+      return playingShuffleOrder[playingShufflePos + 1];
+    }
+  } else {
+    if (playingIndex + 1 < playingTracks.length) {
+      return playingIndex + 1;
+    }
+  }
+  return -1;
+}
+
+
+
 function handleEnded() {
   if (audio.loop) return;
 
@@ -365,8 +380,6 @@ function handleEnded() {
     bindAudioEvents(audio);       // перевязываем все UI-события на новый плеер
     setPlayIcon(false);
     currentResumeTitle();
-    // подготовим следующий предварительно
-    updateNextPreload();
     return;
   }
 
@@ -587,48 +600,9 @@ function playFromPlaying() {
   // Стартуем с fallback’ами
   tryPlayWithFallback();
   highlightCurrentPlaying();
-  updateNextPreload();
 }
 
 
-let nextAudio = null;   // ВТОРОЙ плеер для следующего трека
-let nextNextSrc = null; // (опционально) адрес +2
-
-function updateNextPreload() {
-  // вычислим индексы next / next+1
-  let n1 = -1, n2 = -1;
-  if (playingMode === "shuffle" && playingShuffleOrder.length) {
-    if (playingShufflePos + 1 < playingShuffleOrder.length) n1 = playingShuffleOrder[playingShufflePos + 1];
-    if (playingShufflePos + 2 < playingShuffleOrder.length) n2 = playingShuffleOrder[playingShufflePos + 2];
-  } else {
-    if (playingIndex + 1 < playingTracks.length) n1 = playingIndex + 1;
-    if (playingIndex + 2 < playingTracks.length) n2 = playingIndex + 2;
-  }
-
-  const s1 = (n1 !== -1) ? getTrackLinkByName(playingTracks[n1].name) : null;
-  const s2 = (n2 !== -1) ? getTrackLinkByName(playingTracks[n2].name) : null;
-
-  // если уже есть nextAudio с тем же src — оставим как есть
-  if (nextAudio && s1 && nextAudio.src === s1) {
-    nextNextSrc = s2 || null;
-    return;
-  }
-
-  // переинициализируем nextAudio
-  if (nextAudio) { try { nextAudio.pause(); } catch{} nextAudio.src = ""; nextAudio = null; }
-
-  if (s1) {
-    nextAudio = new Audio();
-    nextAudio.preload = "auto";
-    nextAudio.src = s1;
-    nextAudio.loop = false;
-    nextAudio.muted = true;             // критично!
-    nextAudio.playsInline = true;
-    // запускаем “тихо” — это разрешено на мобильных
-    nextAudio.play().catch(()=>{ /* ок, некоторые браузеры всё равно буферят */ });
-  }
-  nextNextSrc = s2 || null;
-}
 
 
 function highlightCurrentPlaying() {
@@ -708,7 +682,6 @@ function goNext() {
     const tr = playingTracks[playingIndex];
     nowPlaying && (nowPlaying.textContent = `Сейчас играет: ${tr.artist} — ${tr.title}`);
     bpTitle && (bpTitle.textContent = `${tr.artist} — ${tr.title}`);
-    updateNextPreload();
     return;
   }
 
@@ -759,20 +732,31 @@ audio.addEventListener('pause', ()=>setPlayIcon(true));
 audio.addEventListener('ended', () => {
   if (audio.loop) return;
 
-  let nextIdx = -1;
-  if (playingMode === "shuffle") {
-    if (playingShufflePos + 1 < playingShuffleOrder.length) {
-      nextIdx = playingShuffleOrder[playingShufflePos + 1];
-      playingShufflePos++;
-    }
-  } else {
-    if (playingIndex + 1 < playingTracks.length) nextIdx = playingIndex + 1;
-  }
-  if (nextIdx === -1) return;
+  const nextIdx = computeNextIndex();
+  if (nextIdx === -1) return;            // очередь кончилась — тишина
 
-  // раньше тут было условие по visibility — убираем
-  scheduleAutoNext(nextIdx, 0);
+  // Продвинем указатели
+  if (playingMode === "shuffle") playingShufflePos++;
+  playingIndex = nextIdx;
+
+  // Подготовим следующий трек
+  const tr = playingTracks[playingIndex];
+  const src = getTrackLinkByName(tr.name);
+  if (!src) return;
+
+  // Критично: НЕ вызываем play(). Полагайся на autoplay + load()
+  audio.src = src;
+  audio.currentTime = 0;
+  audio.load();                           // браузер сам начнёт воспроизведение
+
+  // UI/метаданные
+  nowPlaying && (nowPlaying.textContent = `Сейчас играет: ${tr.artist} — ${tr.title}`);
+  if (window._updateTrackMetadata) {
+    _updateTrackMetadata({ title: tr.title, artist: tr.artist, album: tr.album||'', artwork: tr.cover||'favicon.png' });
+  }
+  highlightCurrentPlaying();
 });
+
 
 
 
