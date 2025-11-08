@@ -162,7 +162,7 @@
   <div class="main-card">
     <header>
       <div class="header-row">
-        <h1>Audio6</h1>
+        <h1>Audio8</h1>
         <div class="search-container">
           <input id="search-input" type="text" placeholder="Поиск музыки..." autocomplete="off" />
         </div>
@@ -514,37 +514,6 @@ function playFromPlaying(resumeTime = null, opts = {}) {
 
 
 
-  // Жёстко сбрасываем, чтобы мобилки не «залипали» на старом источнике
-  if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
-  pendingAutoplay = false;
-
-  audio.pause();
-  audio.src = audioSrc;
-  audio.currentTime = 0;
-  // Явно перезагружаем метаданные/буфер
-  audio.load();
-
-  nowPlaying.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
-  const bpTitle = document.getElementById("bp-title");
-  if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
-
-  // Media Session (оставляю как у тебя)
-  if (window._updateTrackMetadata) {
-    window._updateTrackMetadata({
-      title: track.title,
-      artist: track.artist,
-      album: track.album || '',
-      artwork: track.cover || 'favicon.png'
-    });
-  }
-
-  // Стартуем с fallback’ами
-  tryPlayWithFallback();
-  highlightCurrentPlaying();
-  updateNextPreload();
-}
-
-
 let nextAudio = null;
 function updateNextPreload() {
   let nextIndex = -1;
@@ -694,41 +663,47 @@ function reflectRepeatUI(){
 }
 
 /* клики — низ */
-bottomShuffleBtn && (bottomShuffleBtn.onclick = () => {
-  if (!filteredTracks || !filteredTracks.length) return;
+bottomShuffleBtn.onclick = () => {
+  if (!filteredTracks.length) return;
 
-  const turningOn = (playingMode !== 'shuffle');
-  const currentId = (playingTracks[playingIndex] && playingTracks[playingIndex].name) ? playingTracks[playingIndex].name : null;
+  const turningOn = (playingMode !== "shuffle");
+  const currentId =
+    playingTracks[playingIndex] && playingTracks[playingIndex].name
+      ? playingTracks[playingIndex].name
+      : null;
   const resume = isFinite(audio.currentTime) ? audio.currentTime : 0;
 
   if (turningOn) {
+    // если очереди ещё нет — создаём из видимых и якоримся на случайном
     if (!playingTracks.length) {
       playingTracks = filteredTracks.slice();
       playingIndex = Math.floor(Math.random() * playingTracks.length);
     }
+    // строим порядок шаффла вокруг текущего трека
     buildShuffleFromCurrent(playingIndex);
-    playingMode = 'shuffle';
+    playingMode = "shuffle";
 
-    // НЕ перезагружаем источник — продолжаем с того же места
+    // НЕ перезагружаем источник — продолжаем
     playFromPlaying(resume, { skipReload: true });
   } else {
-    playingMode = 'order';
+    // режим order — остаёмся на том же треке
+    playingMode = "order";
     if (currentId) {
       const idx = playingTracks.findIndex(t => t.name === currentId);
       if (idx !== -1) playingIndex = idx;
     }
+    // тоже без перезагрузки
     playFromPlaying(resume, { skipReload: true });
   }
-  reflectShuffleUI();
-});
 
+  reflectShuffleUI();
+};
 
 
 bottomRepeatBtn.onclick = () => { audio.loop = !audio.loop; reflectRepeatUI(); };
 
 /* клики — верх (делают то же) */
-topShuffleBtn && (topShuffleBtn.onclick = () => bottomShuffleBtn.click());
-
+topShuffleBtn.onclick = () => bottomShuffleBtn.click();
 topRepeatBtn.onclick  = () => bottomRepeatBtn.click();
 
 /* первичная синхронизация */
