@@ -162,7 +162,7 @@
   <div class="main-card">
     <header>
       <div class="header-row">
-        <h1>Audio3</h1>
+        <h1>Audio4</h1>
         <div class="search-container">
           <input id="search-input" type="text" placeholder="Поиск музыки..." autocomplete="off" />
         </div>
@@ -238,6 +238,7 @@ let seekingBP = false;
 let pendingAutoplay = false;   // нужно автозапустить, но мобилка заблокировала
 let playRetryTimer = null;     // watchdog-повтор
 
+let awaitingAutostart = false;
 
 let audio = document.getElementById("audio-element");
 bindAudioEvents(audio);
@@ -372,7 +373,7 @@ function handleEnded() {
 function endedAutoAdvance() {
   if (audio.loop) return;
 
-  // вычисляем следующий индекс
+  // 1) вычисляем следующий индекс и сдвигаем указатели
   let nextIdx = -1;
   if (playingMode === "shuffle") {
     if (playingShufflePos + 1 < playingShuffleOrder.length) {
@@ -384,22 +385,37 @@ function endedAutoAdvance() {
   }
   if (nextIdx === -1) return; // очередь кончилась
 
-  // продвигаем и подготавливаем источник без play()
   playingIndex = nextIdx;
   const tr = playingTracks[playingIndex];
   const src = getTrackLinkByName(tr.name);
   if (!src) return;
 
+  // 2) Готовим следующий трек без явного play()
+  awaitingAutostart = true;
+  audio.autoplay = true;              // страховка
   audio.src = src;
   audio.currentTime = 0;
-  audio.load(); // autoplay сам запустит
+  audio.load();                       // в фоне должен сам стартовать
 
+  // 3) UI и Media Session сразу обновляем
   nowPlaying && (nowPlaying.textContent = `Сейчас играет: ${tr.artist} — ${tr.title}`);
+  typeof bpTitle !== 'undefined' && bpTitle && (bpTitle.textContent = `${tr.artist} — ${tr.title}`);
   if (window._updateTrackMetadata) {
-    _updateTrackMetadata({ title: tr.title, artist: tr.artist, album: tr.album||'', artwork: tr.cover||'favicon.png' });
+    _updateTrackMetadata({
+      title: tr.title, artist: tr.artist,
+      album: tr.album || '', artwork: tr.cover || 'favicon.png'
+    });
   }
   highlightCurrentPlaying();
+
+  // 4) Если вкладка видима, дадим мягкий «пинок», если autoplay не сработал
+  setTimeout(() => {
+    if (document.visibilityState === 'visible' && awaitingAutostart && audio.paused) {
+      audio.play().catch(()=>{ /* ок, оставим до жеста */ });
+    }
+  }, 600);
 }
+
 
 
 
@@ -651,6 +667,12 @@ function goNext() {
 
 
 
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && awaitingAutostart && audio.paused) {
+    awaitingAutostart = false;
+    audio.play().catch(()=>{ /* пользователь ткнёт сам */ });
+  }
+});
 
 
 prevBtn.onclick = goPrev; nextBtn.onclick = goNext;
@@ -689,33 +711,6 @@ bpSeek.addEventListener('change', (e)=>{ audio.currentTime = e.target.valueAsNum
 audio.addEventListener('play', ()=>setPlayIcon(false));
 audio.addEventListener('pause', ()=>setPlayIcon(true));
 
-audio.addEventListener('ended', () => {
-  if (audio.loop) return;
-
-  const nextIdx = computeNextIndex();
-  if (nextIdx === -1) return;            // очередь кончилась — тишина
-
-  // Продвинем указатели
-  if (playingMode === "shuffle") playingShufflePos++;
-  playingIndex = nextIdx;
-
-  // Подготовим следующий трек
-  const tr = playingTracks[playingIndex];
-  const src = getTrackLinkByName(tr.name);
-  if (!src) return;
-
-  // Критично: НЕ вызываем play(). Полагайся на autoplay + load()
-  audio.src = src;
-  audio.currentTime = 0;
-  audio.load();                           // браузер сам начнёт воспроизведение
-
-  // UI/метаданные
-  nowPlaying && (nowPlaying.textContent = `Сейчас играет: ${tr.artist} — ${tr.title}`);
-  if (window._updateTrackMetadata) {
-    _updateTrackMetadata({ title: tr.title, artist: tr.artist, album: tr.album||'', artwork: tr.cover||'favicon.png' });
-  }
-  highlightCurrentPlaying();
-});
 
 
 
