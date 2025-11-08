@@ -267,6 +267,42 @@ const trackListDiv = document.getElementById("track-list");
 const shuffleAboveBtn = document.getElementById('shuffle-above-tracks');
 const searchInput = document.getElementById("search-input");
 
+// --- безопасные заглушки, чтобы ничего не падало ---
+function setPlayIcon(paused){ try{
+  const el1 = document.getElementById('play-pause');
+  const el2 = document.getElementById('bottom-play-pause');
+  if (el1) el1.textContent = paused ? '▶️' : '⏸️';
+  if (el2) el2.textContent = paused ? '▶️' : '⏸️';
+} catch{} }
+
+function tryPlayWithFallback(){
+  try {
+    const p = audio.play();
+    if (p && typeof p.then==='function') {
+      p.then(()=>setPlayIcon(false)).catch(()=>setPlayIcon(true));
+    } else {
+      setPlayIcon(false);
+    }
+  } catch { setPlayIcon(true); }
+}
+
+function reflectShuffleUI(){
+  const on = (typeof playingMode!=='undefined' && playingMode==='shuffle');
+  ['top-shuffle','bottom-shuffle','shuffle-above-tracks'].forEach(id=>{
+    const b = document.getElementById(id);
+    if (b) b.classList.toggle('active', on);
+  });
+}
+
+function buildShuffleFromCurrent(currIndex){
+  // если уже есть порядок — пересоберём
+  if (!Array.isArray(playingTracks) || !playingTracks.length) return;
+  playingShuffleOrder = playingTracks.map((_,i)=>i).sort(()=>Math.random()-0.5);
+  const pos = playingShuffleOrder.indexOf(currIndex);
+  playingShufflePos = pos >= 0 ? pos : 0;
+}
+
+
 function getQueryParam(name) {
   const urlParams = new URLSearchParams(window.location.search);
   return urlParams.get(name);
@@ -431,18 +467,53 @@ audio.addEventListener('waiting', () => {
 
 
 
-function playFromPlaying() {
+function playFromPlaying(resumeTime = null, opts = {}) {
+  const skipReload = opts && opts.skipReload === true;
   if (playingIndex < 0 || playingIndex >= playingTracks.length) return;
 
   const track = playingTracks[playingIndex];
-  const audioSrc = getTrackLinkByName(track.name);
-  if (!audioSrc) {
-    nowPlaying.textContent = "Ссылка на трек не найдена";
-    const bpTitle = document.getElementById("bp-title");
-    if (bpTitle) bpTitle.textContent = "";
+  const src = (typeof getTrackLinkByName==='function') ? getTrackLinkByName(track.name) : null;
+  if (!src) {
+    const np = document.getElementById('now-playing');
+    if (np) np.textContent = 'Ссылка на трек не найдена';
     setPlayIcon(true);
     return;
   }
+
+  // если трек тот же и просили не перезагружать — просто продолжаем
+  if (skipReload && audio.src && audio.src.endsWith(src)) {
+    if (resumeTime != null && isFinite(resumeTime)) {
+      try { audio.currentTime = resumeTime; } catch {}
+    }
+    const np = document.getElementById('now-playing');
+    if (np) np.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
+    const bpTitle = document.getElementById('bp-title');
+    if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
+    tryPlayWithFallback();
+    if (typeof highlightCurrentPlaying==='function') highlightCurrentPlaying();
+    return;
+  }
+
+  // обычный запуск (источник меняем)
+  try { audio.pause(); } catch {}
+  audio.src = src;
+  audio.load();
+
+  const np = document.getElementById('now-playing');
+  if (np) np.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
+  const bpTitle = document.getElementById('bp-title');
+  if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
+
+  if (resumeTime != null && isFinite(resumeTime)) {
+    try { audio.currentTime = resumeTime; } catch {}
+  } else {
+    try { audio.currentTime = 0; } catch {}
+  }
+
+  tryPlayWithFallback();
+  if (typeof highlightCurrentPlaying==='function') highlightCurrentPlaying();
+}
+
 
   // Жёстко сбрасываем, чтобы мобилки не «залипали» на старом источнике
   if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
@@ -624,47 +695,41 @@ function reflectRepeatUI(){
 }
 
 /* клики — низ */
-bottomShuffleBtn.onclick = () => {
-  if (!filteredTracks.length) return;
+bottomShuffleBtn && (bottomShuffleBtn.onclick = () => {
+  if (!filteredTracks || !filteredTracks.length) return;
 
-  const turningOn = (playingMode !== "shuffle");
-  const currentId =
-    playingTracks[playingIndex] && playingTracks[playingIndex].name
-      ? playingTracks[playingIndex].name
-      : null;
+  const turningOn = (playingMode !== 'shuffle');
+  const currentId = (playingTracks[playingIndex] && playingTracks[playingIndex].name) ? playingTracks[playingIndex].name : null;
   const resume = isFinite(audio.currentTime) ? audio.currentTime : 0;
 
   if (turningOn) {
-    // если очереди ещё нет — создаём из видимых и якоримся на случайном
     if (!playingTracks.length) {
       playingTracks = filteredTracks.slice();
       playingIndex = Math.floor(Math.random() * playingTracks.length);
     }
-    // строим порядок шаффла вокруг текущего трека
     buildShuffleFromCurrent(playingIndex);
-    playingMode = "shuffle";
+    playingMode = 'shuffle';
 
-    // НЕ перезагружаем источник — продолжаем
+    // НЕ перезагружаем источник — продолжаем с того же места
     playFromPlaying(resume, { skipReload: true });
   } else {
-    // режим order — остаёмся на том же треке
-    playingMode = "order";
+    playingMode = 'order';
     if (currentId) {
       const idx = playingTracks.findIndex(t => t.name === currentId);
       if (idx !== -1) playingIndex = idx;
     }
-    // тоже без перезагрузки
     playFromPlaying(resume, { skipReload: true });
   }
-
   reflectShuffleUI();
-};
+});
+
 
 
 bottomRepeatBtn.onclick = () => { audio.loop = !audio.loop; reflectRepeatUI(); };
 
 /* клики — верх (делают то же) */
-topShuffleBtn.onclick = () => bottomShuffleBtn.click();
+topShuffleBtn && (topShuffleBtn.onclick = () => bottomShuffleBtn.click());
+
 topRepeatBtn.onclick  = () => bottomRepeatBtn.click();
 
 /* первичная синхронизация */
