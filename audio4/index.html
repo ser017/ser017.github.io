@@ -162,7 +162,7 @@
   <div class="main-card">
     <header>
       <div class="header-row">
-        <h1>Audio5</h1>
+        <h1>Audio6</h1>
         <div class="search-container">
           <input id="search-input" type="text" placeholder="Поиск музыки..." autocomplete="off" />
         </div>
@@ -468,20 +468,19 @@ audio.addEventListener('waiting', () => {
 
 
 function playFromPlaying(resumeTime = null, opts = {}) {
-  const skipReload = opts && opts.skipReload === true;
   if (playingIndex < 0 || playingIndex >= playingTracks.length) return;
 
   const track = playingTracks[playingIndex];
-  const src = (typeof getTrackLinkByName==='function') ? getTrackLinkByName(track.name) : null;
-  if (!src) {
+  const audioSrc = getTrackLinkByName(track.name);
+  if (!audioSrc) {
     const np = document.getElementById('now-playing');
     if (np) np.textContent = 'Ссылка на трек не найдена';
-    setPlayIcon(true);
     return;
   }
 
-  // если трек тот же и просили не перезагружать — просто продолжаем
-  if (skipReload && audio.src && audio.src.endsWith(src)) {
+  const skipReload = opts && opts.skipReload === true;
+  // Если просили НЕ перезагружать и источник не меняется — продолжим с того же места
+  if (skipReload && audio.src && (audio.src === audioSrc || audio.src.endsWith(audioSrc))) {
     if (resumeTime != null && isFinite(resumeTime)) {
       try { audio.currentTime = resumeTime; } catch {}
     }
@@ -489,14 +488,14 @@ function playFromPlaying(resumeTime = null, opts = {}) {
     if (np) np.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
     const bpTitle = document.getElementById('bp-title');
     if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
-    tryPlayWithFallback();
-    if (typeof highlightCurrentPlaying==='function') highlightCurrentPlaying();
+    if (audio.paused) { audio.play().catch(()=>{}); }
+    if (typeof highlightCurrentPlaying === 'function') highlightCurrentPlaying();
     return;
   }
 
-  // обычный запуск (источник меняем)
+  // Обычный запуск (когда реально меняем трек/нужно перезагрузить)
   try { audio.pause(); } catch {}
-  audio.src = src;
+  audio.src = audioSrc;
   audio.load();
 
   const np = document.getElementById('now-playing');
@@ -509,10 +508,10 @@ function playFromPlaying(resumeTime = null, opts = {}) {
   } else {
     try { audio.currentTime = 0; } catch {}
   }
-
-  tryPlayWithFallback();
-  if (typeof highlightCurrentPlaying==='function') highlightCurrentPlaying();
+  audio.play().catch(()=>{});
+  if (typeof highlightCurrentPlaying === 'function') highlightCurrentPlaying();
 }
+
 
 
   // Жёстко сбрасываем, чтобы мобилки не «залипали» на старом источнике
