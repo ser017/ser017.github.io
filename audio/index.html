@@ -625,13 +625,38 @@ function reflectRepeatUI(){
 
 /* клики — низ */
 bottomShuffleBtn.onclick = () => {
-  const turnOn = playingMode !== "shuffle";
-  if (!playingTracks.length && filteredTracks.length) {
-    playingTracks = filteredTracks.slice(); playingIndex = 0;
+  if (!filteredTracks.length) return; // нечего мешать
+
+  const turningOn = (playingMode !== "shuffle");
+  const resume = (!Number.isNaN(audio.currentTime)) ? audio.currentTime : 0;
+
+  if (turningOn) {
+    // если очередь ещё не создана — создаём из видимых треков
+    if (!playingTracks.length) {
+      playingTracks = filteredTracks.slice();
+      // СЛУЧАЙНЫЙ стартовый трек (а не первый)
+      playingIndex = Math.floor(Math.random() * playingTracks.length);
+    }
+    // включаем шаффл, якорим на текущем треке
+    setShuffle(true); // внутри построит playingShuffleOrder с учётом playingIndex
+    // ставим указатель на позицию текущего трека в шаффл-очереди
+    const pos = playingShuffleOrder.indexOf(playingIndex);
+    playingShufflePos = (pos >= 0) ? pos : 0;
+    playingIndex = playingShuffleOrder[playingShufflePos];
+
+    playFromPlaying(resume);
+  } else {
+    // выключаем шаффл — оставляем тот же трек и позицию
+    const currentId = (playingTracks[playingIndex] && playingTracks[playingIndex].name) ? playingTracks[playingIndex].name : null;
+    setShuffle(false); // режим order
+    if (currentId) {
+      const idx = playingTracks.findIndex(t => t.name === currentId);
+      if (idx !== -1) playingIndex = idx;
+    }
+    playFromPlaying(resume);
   }
-  setShuffle(turnOn);
-  if (turnOn) { playingIndex = playingShuffleOrder[playingShufflePos]; playFromPlaying(); }
 };
+
 bottomRepeatBtn.onclick = () => { audio.loop = !audio.loop; reflectRepeatUI(); };
 
 /* клики — верх (делают то же) */
@@ -707,5 +732,6 @@ if ('mediaSession' in navigator) {
 </script>
 </body>
 </html>
+
 
 
