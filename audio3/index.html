@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>my audio</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root { --rail:#2a2b2f; --card:#1c1d22; --accent:#3b82f6; }
+
+    /* нижняя панель по умолчанию скрыта */
+    .bottom-player { display:none; }
+
+    /* Показ нижней панели на мобилках или узком окне (удобно тестить) */
+    @media ( (hover:none) and (pointer:coarse) ), (max-width:900px) {
+      body { padding-bottom: 148px; }
+      .bottom-player{
+        display:block;
+        position:fixed; left:0; right:0; bottom:0;
+        z-index:1000;
+        background:#111;
+        border-top:1px solid #222;
+        padding:22px 12px calc(12px + env(safe-area-inset-bottom));               /* !!!!!! первое сверху, второе сбоку, третье снизу */
+      }
+      .bp-top{ display:flex; align-items:center; gap:10px; margin:0 4px 10px; }
+      .bp-time{ color:#cfd1d6; font-size:13px; min-width:46px; }
+      .bp-time.right{ text-align:right; }
+      #bp-seek{
+        flex:1; appearance:none; height:8px; border-radius:999px;
+        background:var(--rail); outline:none;
+      }
+      .controls{
+        display:flex; align-items:center; justify-content:space-between; gap:12px;
+        padding-top: 20px;                                                        /* !!!!!! между плеером и кнопками */
+        padding-bottom: 12px;
+      }
+      .big-btn{
+        font-size:28px; line-height:1; color:#fff;                                /* !!!!!! размеры кнопок можно увеличивать */
+        background:var(--card); border:0; border-radius:18px;
+        padding:18px; min-width:72px; min-height:72px; cursor:pointer;
+        -webkit-tap-highlight-color: rgba(0,0,0,0);
+      }
+      .big-btn:active{ transform: translateY(1px); }
+      .big-btn.toggle.active{ outline:2px solid var(--accent); }
+    }
+
+    /* Подсветка верхних toggle-кнопок */
+    .player-btn.toggle.active{ outline:2px solid var(--accent); }
+
+    /* Мобильный пресет: больше треки, без правого "поля", удобные тач-зоны */
+    @media ((hover: none) and (pointer: coarse)) , (max-width: 900px) {
+      /* контейнер на всю ширину экрана */
+      .main-card {
+        max-width: 100%;
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+
+      /* список треков — без лишних отступов и с полной шириной */
+      #track-list {
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      /* сами треки — крупнее и "толще" */
+      .track {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        font-size: clamp(17px, 3vw, 21px);
+        line-height: 1.25;
+        padding: 14px 16px;
+        margin: 10px 0;
+        border-radius: 12px;
+        -webkit-tap-highlight-color: rgba(0,0,0,0);
+      }
+
+      /* чтобы верхняя панель не съедала место: визуально компактнее */
+      .player-bar {
+        gap: 8px;
+      }
+      .player-seekbar {
+        height: 8px;
+      }
+    }
+
+    /* Мобилка: скрыть верхний плеер, оставить заголовок + поиск в ОДНУ строку */
+    @media ((hover: none) and (pointer: coarse)) , (max-width: 900px) {
+      /* скрыть верхний плеер и "Сейчас играет" */
+      .player-bar,
+      #now-playing {
+        display: none !important;
+      }
+
+      /* заголовок + поиск в одну линию */
+      .header-row {
+        display: flex;
+        flex-direction: row;      /* важно: обратно в строку */
+        align-items: center;
+        gap: 10px;
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      /* заголовок не переносим и не растягиваем */
+      .header-row h1 {
+        margin: 0;
+        white-space: nowrap;
+        flex: 0 0 auto;
+      }
+
+      /* контейнер поиска занимает всё оставшееся */
+      .search-container {
+        margin-left: 18px;        /* отступ до строка поиска */
+        flex: 1 1 auto;
+        max-width: none;
+        display: flex;
+      }
+
+      /* инпут поиска растягивается полностью, без минималки */
+      #search-input {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        box-sizing: border-box;
+        margin: 0;
+      }
+    }
+
+    /* === MOBILE FIXES === */
+    @media ((hover:none) and (pointer:coarse)) , (max-width:900px) {
+
+      /* 1) Реальный запас под высокий нижний плеер */
+      :root { --bp-safe: 60px; } /* подгони под свою высоту панели */
+
+      /* запас для страницы + safe area */
+      body { padding-bottom: calc(var(--bp-safe) + env(safe-area-inset-bottom)) !important; }
+
+      /* если скроллится основной контент — тоже добавим запас */
+      main, #track-list {
+        padding-bottom: calc(var(--bp-safe) + 16px + env(safe-area-inset-bottom));
+      }
+
+      /* 2) Шапка должна быть чёрной во всю ширину
+            Причина «полосок» — паддинги у .main-card на мобилке. Убираем их. */
+      .main-card { padding-left: 0; padding-right: 0; }
+
+      /* добавим горизонтальные поля контенту вместо .main-card */
+      header .header-row { padding-left: 12px; padding-right: 12px; }
+      .playlists-section { padding-left: 12px; padding-right: 12px; }
+      main { padding-left: 12px; padding-right: 12px; }
+    }
+
+
+
+  </style>
+</head>
+<body>
+  <div class="main-card">
+    <header>
+      <div class="header-row">
+        <h1>Audio</h1>
+        <div class="search-container">
+          <input id="search-input" type="text" placeholder="Поиск музыки..." autocomplete="off" />
+        </div>
+      </div>
+
+      <!-- ВЕРХНИЙ ПЛЕЕР -->
+      <div class="player-bar">
+        <button id="prev" class="player-btn">⏮️</button>
+        <button id="play-pause" class="player-btn">▶️</button>
+        <button id="next" class="player-btn">⏭️</button>
+
+        <!-- Новые кнопки сверху -->
+        <button id="top-shuffle" class="player-btn toggle" title="Перемешать">🔀</button>
+        <button id="top-repeat"  class="player-btn toggle" title="Зациклить">🔁</button>
+
+        <input type="range" id="seekbar" value="0" min="0" max="100" step="0.01" class="player-seekbar">
+        <span id="current-time" class="player-time">0:00</span>
+      </div>
+
+      <div id="now-playing" class="now-playing">Сейчас ничего не играет</div>
+      <audio id="audio-element" preload="auto" playsinline></audio>
+    </header>
+
+    <!-- Плейлисты -->
+    <div class="playlists-section">
+      <div class="playlists-header">
+        <h2>Плейлисты</h2>
+        <button id="show-all-playlists" style="display:none;">Показать все</button>
+      </div>
+      <div id="playlists-list" class="playlists-list"></div>
+    </div>
+
+    <main>
+      <button id="shuffle-above-tracks" class="shuffle-above-tracks" style="display:none;">
+        <span class="shuffle-icon">🔀</span> Перемешать всё
+      </button>
+      <div id="track-list"></div>
+    </main>
+  </div>
+
+  <!-- НИЖНЯЯ МОБИЛЬНАЯ ПАНЕЛЬ -->
+  <div class="bottom-player" aria-label="Плеер">
+    <div class="bp-top">
+      <span class="bp-time" id="bp-time-left">0:00</span>
+      <input type="range" id="bp-seek" value="0" min="0" max="100" step="0.01">
+      <span class="bp-time right" id="bp-time-right">-0:00</span>
+    </div>
+    <div class="controls">
+      <button id="bottom-shuffle" class="big-btn toggle" title="Перемешать">🔀</button>
+      <button id="bottom-prev" class="big-btn" title="Предыдущий">⏮️</button>
+      <button id="bottom-play-pause" class="big-btn" title="Пауза/Воспроизвести">▶️</button>
+      <button id="bottom-next" class="big-btn" title="Следующий">⏭️</button>
+      <button id="bottom-repeat" class="big-btn toggle" title="Зациклить">🔁</button>
+    </div>
+    <div id="bp-title" class="bp-title"> </div>
+  </div>
+
+<script>
+let playlistsData = [];
+let visibleTracks = [];
+let playingTracks = [];
+let playingIndex = -1;
+
+let playingMode = "order";   // order | shuffle
+let playingShuffleOrder = [];
+let playingShufflePos = 0;
+
+let linksData = [];
+let filteredTracks = [];
+let seeking = false;
+let seekingBP = false;
+
+let pendingAutoplay = false;   // нужно автозапустить, но мобилка заблокировала
+let playRetryTimer = null;     // watchdog-повтор
+
+let queuedAutoNext = null;   // { index, resume }
+let resumeOnUserGesture = false;
+
+const audio = document.getElementById("audio-element");
+const nowPlaying = document.getElementById("now-playing");
+
+// Верх
+const playPauseBtn = document.getElementById("play-pause");
+const prevBtn = document.getElementById("prev");
+const nextBtn = document.getElementById("next");
+const seekbar = document.getElementById("seekbar");
+const currentTimeSpan = document.getElementById("current-time");
+
+// Новые верхние кнопки
+const topShuffleBtn = document.getElementById("top-shuffle");
+const topRepeatBtn  = document.getElementById("top-repeat");
+
+// Низ
+const bottomShuffleBtn = document.getElementById("bottom-shuffle");
+const bottomPrevBtn = document.getElementById("bottom-prev");
+const bottomPlayPauseBtn = document.getElementById("bottom-play-pause");
+const bottomNextBtn = document.getElementById("bottom-next");
+const bottomRepeatBtn = document.getElementById("bottom-repeat");
+const bpSeek = document.getElementById("bp-seek");
+const bpTimeLeft = document.getElementById("bp-time-left");
+const bpTimeRight = document.getElementById("bp-time-right");
+
+// UI
+const trackListDiv = document.getElementById("track-list");
+const shuffleAboveBtn = document.getElementById('shuffle-above-tracks');
+const searchInput = document.getElementById("search-input");
+
+function getQueryParam(name) {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get(name);
+}
+function formatTime(time) {
+  if (isNaN(time) || !isFinite(time)) return "0:00";
+  const m = Math.floor(time / 60);
+  const s = Math.floor(time % 60);
+  return m + ":" + (s < 10 ? "0" : "") + s;
+}
+
+fetch('links.json')
+  .then(res => res.json())
+  .then(links => {
+    linksData = links;
+    return fetch('playlists/playlists.json');
+  })
+  .then(res => res.json())
+  .then(playlists => {
+    playlistsData = playlists;
+    renderPlaylists(playlistsData);
+    const playlistFromUrl = getQueryParam('playlist');
+    let initialPl = null;
+    if (playlistFromUrl && playlistsData.length > 0) {
+      initialPl = playlistsData.find(pl => pl.list === playlistFromUrl);
+    }
+    if (!initialPl && playlistsData.length > 0) initialPl = playlistsData[0];
+    if (initialPl) filterTracksByPlaylist(initialPl);
+  })
+  .catch(()=>{});
+
+function renderPlaylists(playlists) {
+  const playlistsList = document.getElementById('playlists-list');
+  playlistsList.innerHTML = '';
+  const maxVisible = 7;
+
+  playlists.slice(0, maxVisible).forEach((pl) => {
+    const div = document.createElement('div');
+    div.className = 'playlist-card';
+    div.innerHTML = `
+      <img src="${pl.cover}" alt="${pl.title}" class="playlist-cover"/>
+      <div class="playlist-title">${pl.title}</div>
+      <div class="playlist-author">${pl.author || ''}</div>
+    `;
+    div.addEventListener('click', () => filterTracksByPlaylist(pl));
+    playlistsList.appendChild(div);
+  });
+
+  const showAllBtn = document.getElementById('show-all-playlists');
+  if (showAllBtn) {
+    showAllBtn.style.display = playlists.length > maxVisible ? '' : 'none';
+    showAllBtn.onclick = () => window.location.href = 'playlists/';
+  }
+}
+
+function filterTracksByPlaylist(playlist) {
+  const listFolder = playlist.list;
+  fetch(`playlists/${listFolder}/tracks.json`)
+    .then(res => res.json())
+    .then(playlistTracks => {
+      visibleTracks = playlistTracks;
+      renderTracks(playlistTracks);
+    });
+}
+
+function renderTracks(tracks) {
+  filteredTracks = tracks.slice();
+  trackListDiv.innerHTML = '';
+  tracks.forEach((track, index) => {
+    const trackDiv = document.createElement('div');
+    trackDiv.className = 'track';
+    trackDiv.textContent = `${track.artist} — ${track.title}`;
+    trackDiv.onclick = () => {
+      if (
+        playingTracks.length &&
+        playingTracks[playingIndex] &&
+        filteredTracks[index] &&
+        playingTracks[playingIndex].name === filteredTracks[index].name
+      ) {
+        togglePlayPause();
+        return;
+      }
+      playingTracks = filteredTracks.slice();
+      playingIndex = index;
+      setShuffle(false);
+      playFromPlaying();
+    };
+    trackListDiv.appendChild(trackDiv);
+  });
+  updateShuffleAboveBtn();
+  highlightCurrentPlaying();
+}
+
+searchInput && searchInput.addEventListener("input", function() {
+  const q = searchInput.value.trim().toLowerCase();
+  if (!q) return renderTracks(visibleTracks);
+  const filtered = visibleTracks.filter(
+    t => (t.title && t.title.toLowerCase().includes(q)) ||
+         (t.artist && t.artist.toLowerCase().includes(q))
+  );
+  renderTracks(filtered);
+});
+
+function updateShuffleAboveBtn() {
+  if (!shuffleAboveBtn) return;
+  shuffleAboveBtn.style.display = filteredTracks.length > 1 ? '' : 'none';
+}
+shuffleAboveBtn && (shuffleAboveBtn.onclick = () => {
+  if (!filteredTracks.length) return;
+  playingTracks = filteredTracks.slice();
+  buildShuffleFromCurrent(-1);
+  playingIndex = playingShuffleOrder[playingShufflePos];
+  playingMode = "shuffle";
+  playFromPlaying();
+  reflectShuffleUI();
+});
+
+function getTrackLinkByName(name) {
+  const found = linksData.find(linkObj => linkObj.name === name);
+  return found ? found.link : null;
+}
+
+async function tryPlayWithFallback() {
+  // если трек уже может играть — ок
+  try {
+    const p = audio.play();
+    if (p && typeof p.then === 'function') await p;
+    pendingAutoplay = false;
+    setPlayIcon(false);
+    return;
+  } catch (err) {
+    // Мобилка не дала автоплей без жеста — ждём пользовательский Play
+    pendingAutoplay = true;
+    setPlayIcon(true);
+  }
+
+  // Watchdog: если через 1500 мс не пошёл timeupdate, пробуем ещё раз
+  if (playRetryTimer) clearTimeout(playRetryTimer);
+  playRetryTimer = setTimeout(() => {
+    if (pendingAutoplay) {
+      audio.play().catch(()=>{ /* всё ещё заблокировано — ждём жест */ });
+    }
+  }, 1500);
+}
+
+// Если произошёл первый сдвиг времени — точно играем
+audio.addEventListener('timeupdate', () => {
+  if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
+  pendingAutoplay = false;
+  setPlayIcon(false);
+});
+
+// Если буферизация застопорилась — пробуем дёрнуть снова
+audio.addEventListener('stalled', () => {
+  if (!audio.paused && !pendingAutoplay) {
+    audio.play().catch(()=>{ /* молча */ });
+  }
+});
+audio.addEventListener('waiting', () => {
+  // Нормально на мобильных, просто не мешаем
+});
+
+function armUserGestureResume() {
+  if (resumeOnUserGesture) return;
+  resumeOnUserGesture = true;
+
+  const kick = () => {
+    resumeOnUserGesture = false;
+    document.removeEventListener('touchend', kick, true);
+    document.removeEventListener('click', kick, true);
+    document.removeEventListener('visibilitychange', onVis, true);
+
+    if (queuedAutoNext) {
+      const { index, resume } = queuedAutoNext;
+      queuedAutoNext = null;
+      playingIndex = index;
+      playFromPlaying(resume);   // обычный запуск — внутри есть fallback
+    } else if (pendingAutoplay) {
+      pendingAutoplay = false;
+      audio.play().catch(()=>{ /* если снова не дали — ждём следующий жест */ });
+    }
+  };
+
+  const onVis = () => {
+    if (document.visibilityState === 'visible') kick();
+  };
+
+  document.addEventListener('touchend', kick, true);
+  document.addEventListener('click', kick, true);
+  document.addEventListener('visibilitychange', onVis, true);
+}
+
+function scheduleAutoNext(targetIndex, resume = 0) {
+  // если мы на виду — пробуем сразу
+  if (document.visibilityState === 'visible') {
+    queuedAutoNext = null;
+    playingIndex = targetIndex;
+    playFromPlaying(resume);
+    // если браузер зарубил автоплей — playFromPlaying выставит pendingAutoplay
+    if (pendingAutoplay) armUserGestureResume();
+  } else {
+    // вкладка скрыта: отложим до возврата
+    queuedAutoNext = { index: targetIndex, resume };
+    armUserGestureResume();
+  }
+}
+
+
+function playFromPlaying() {
+  if (playingIndex < 0 || playingIndex >= playingTracks.length) return;
+
+  const track = playingTracks[playingIndex];
+  const audioSrc = getTrackLinkByName(track.name);
+  if (!audioSrc) {
+    nowPlaying.textContent = "Ссылка на трек не найдена";
+    const bpTitle = document.getElementById("bp-title");
+    if (bpTitle) bpTitle.textContent = "";
+    setPlayIcon(true);
+    return;
+  }
+
+  // Жёстко сбрасываем, чтобы мобилки не «залипали» на старом источнике
+  if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
+  pendingAutoplay = false;
+
+  audio.pause();
+  audio.src = audioSrc;
+  audio.currentTime = 0;
+  // Явно перезагружаем метаданные/буфер
+  audio.load();
+
+  nowPlaying.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
+  const bpTitle = document.getElementById("bp-title");
+  if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
+
+  // Media Session (оставляю как у тебя)
+  if (window._updateTrackMetadata) {
+    window._updateTrackMetadata({
+      title: track.title,
+      artist: track.artist,
+      album: track.album || '',
+      artwork: track.cover || 'favicon.png'
+    });
+  }
+
+  // Стартуем с fallback’ами
+  tryPlayWithFallback();
+  highlightCurrentPlaying();
+  updateNextPreload();
+}
+
+
+let nextAudio = null;
+function updateNextPreload() {
+  let nextIndex = -1;
+  if (playingMode === "shuffle" && playingShuffleOrder && playingShufflePos + 1 < playingShuffleOrder.length) {
+    nextIndex = playingShuffleOrder[playingShufflePos + 1];
+  } else if (playingMode === "order" && playingIndex + 1 < playingTracks.length) {
+    nextIndex = playingIndex + 1;
+  }
+  if (nextIndex >= 0 && nextIndex < playingTracks.length) {
+    const nextTrack = playingTracks[nextIndex];
+    const nextSrc = getTrackLinkByName(nextTrack.name);
+    if (nextSrc) {
+      if (nextAudio) nextAudio.src = "";
+      nextAudio = new Audio();
+      nextAudio.src = nextSrc;
+      nextAudio.preload = "auto";
+    }
+  }
+}
+
+function highlightCurrentPlaying() {
+  const trackDivs = document.querySelectorAll('#track-list .track');
+  filteredTracks.forEach((track, i) => {
+    if (playingTracks[playingIndex] && track.name === playingTracks[playingIndex].name) {
+      trackDivs[i]?.classList.add('active');
+    } else {
+      trackDivs[i]?.classList.remove('active');
+    }
+  });
+}
+
+function togglePlayPause() {
+  // Если раньше мобилка заблокировала автоплей — повторим попытку по жесту
+  if (pendingAutoplay) {
+    pendingAutoplay = false;
+    audio.play().then(()=> setPlayIcon(false)).catch(()=> setPlayIcon(true));
+    return;
+  }
+  if (audio.paused) {
+    audio.play().then(()=> setPlayIcon(false)).catch(()=>{
+      // Если вдруг снова блок, отметим и покажем ▶️
+      pendingAutoplay = true;
+      setPlayIcon(true);
+    });
+  } else {
+    audio.pause();
+    setPlayIcon(true);
+  }
+}
+
+
+
+
+
+function setPlayIcon(paused) {
+  const icon = paused ? "▶️" : "⏸️";
+  playPauseBtn.textContent = icon;
+  bottomPlayPauseBtn.textContent = icon;
+}
+playPauseBtn.onclick = togglePlayPause;
+bottomPlayPauseBtn.onclick = togglePlayPause;
+
+function goPrev() {
+  if (playingMode === "shuffle") {
+    playingShufflePos = Math.max(0, playingShufflePos - 1);
+    playingIndex = playingShuffleOrder[playingShufflePos];
+  } else {
+    if (playingIndex > 0) playingIndex--;
+  }
+  playFromPlaying();
+}
+
+function goNext() {
+  let nextIdx = -1;
+  if (playingMode === "shuffle") {
+    if (playingShufflePos + 1 < playingShuffleOrder.length) {
+      nextIdx = playingShuffleOrder[playingShufflePos + 1];
+      playingShufflePos++;
+    }
+  } else {
+    if (playingIndex + 1 < playingTracks.length) nextIdx = playingIndex + 1;
+  }
+  if (nextIdx === -1) return;
+
+  scheduleAutoNext(nextIdx, 0);
+}
+
+
+
+prevBtn.onclick = goPrev; nextBtn.onclick = goNext;
+bottomPrevBtn.onclick = goPrev; bottomNextBtn.onclick = goNext;
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === "Space" && !["INPUT","TEXTAREA"].includes(document.activeElement.tagName)) {
+    e.preventDefault(); togglePlayPause();
+  }
+});
+
+seekbar.addEventListener('input', (e) => { seeking = true; audio.currentTime = e.target.valueAsNumber; });
+seekbar.addEventListener('change', (e) => { audio.currentTime = e.target.valueAsNumber; seeking = false; });
+
+audio.addEventListener('loadedmetadata', () => {
+  seekbar.max = audio.duration || 0;
+  currentTimeSpan.textContent = "0:00";
+
+  bpSeek.max = audio.duration || 0;
+  bpSeek.value = 0;
+  bpTimeLeft.textContent = "0:00";
+  bpTimeRight.textContent = "-" + formatTime(audio.duration || 0);
+});
+audio.addEventListener('timeupdate', () => {
+  if (!seeking) seekbar.value = audio.currentTime;
+  currentTimeSpan.textContent = formatTime(audio.currentTime);
+
+  if (!seekingBP) bpSeek.value = audio.currentTime;
+  bpTimeLeft.textContent = formatTime(audio.currentTime);
+  const remain = Math.max(0,(audio.duration||0) - audio.currentTime);
+  bpTimeRight.textContent = '-' + formatTime(remain);
+});
+bpSeek.addEventListener('input', (e)=>{ seekingBP = true; audio.currentTime = e.target.valueAsNumber; });
+bpSeek.addEventListener('change', (e)=>{ audio.currentTime = e.target.valueAsNumber; seekingBP = false; });
+
+audio.addEventListener('play', ()=>setPlayIcon(false));
+audio.addEventListener('pause', ()=>setPlayIcon(true));
+
+audio.addEventListener('ended', () => {
+  if (audio.loop) return;
+
+  // вычисляем следующий индекс без запуска
+  let nextIdx = -1;
+  if (playingMode === "shuffle") {
+    if (playingShufflePos + 1 < playingShuffleOrder.length) {
+      nextIdx = playingShuffleOrder[playingShufflePos + 1];
+      playingShufflePos++; // сдвигаем указатель прямо здесь
+    }
+  } else {
+    if (playingIndex + 1 < playingTracks.length) {
+      nextIdx = playingIndex + 1;
+    }
+  }
+
+  if (nextIdx === -1) {
+    // очередь закончилась — ничего не делаем
+    return;
+  }
+
+  // плавный автопереход
+  const resume = 0; // всегда с начала следующего трека
+  scheduleAutoNext(nextIdx, resume);
+});
+
+
+
+
+/* ===== SHUFFLE / REPEAT — общая логика для верхних и нижних кнопок ===== */
+function setShuffle(on) {
+  if (on) {
+    playingMode = "shuffle";
+    buildShuffleFromCurrent(playingIndex);
+  } else {
+    playingMode = "order";
+    playingShuffleOrder = []; playingShufflePos = 0;
+  }
+  reflectShuffleUI();
+}
+function buildShuffleFromCurrent(currIndex) {
+  playingShuffleOrder = playingTracks.map((_, i) => i).sort(() => Math.random() - 0.5);
+  if (currIndex >= 0) {
+    const pos = playingShuffleOrder.indexOf(currIndex);
+    playingShufflePos = pos >= 0 ? pos : 0;
+  } else playingShufflePos = 0;
+}
+function reflectShuffleUI() {
+  const on = (playingMode === "shuffle");
+  bottomShuffleBtn.classList.toggle("active", on);
+  topShuffleBtn.classList.toggle("active", on);
+}
+function reflectRepeatUI(){
+  bottomRepeatBtn.classList.toggle("active", audio.loop);
+  topRepeatBtn.classList.toggle("active",  audio.loop);
+}
+
+/* клики — низ */
+bottomShuffleBtn.onclick = () => {
+  if (!filteredTracks.length) return; // нечего мешать
+
+  const turningOn = (playingMode !== "shuffle");
+  const resume = (!Number.isNaN(audio.currentTime)) ? audio.currentTime : 0;
+
+  if (turningOn) {
+    // если очередь ещё не создана — создаём из видимых треков
+    if (!playingTracks.length) {
+      playingTracks = filteredTracks.slice();
+      // СЛУЧАЙНЫЙ стартовый трек (а не первый)
+      playingIndex = Math.floor(Math.random() * playingTracks.length);
+    }
+    // включаем шаффл, якорим на текущем треке
+    setShuffle(true); // внутри построит playingShuffleOrder с учётом playingIndex
+    // ставим указатель на позицию текущего трека в шаффл-очереди
+    const pos = playingShuffleOrder.indexOf(playingIndex);
+    playingShufflePos = (pos >= 0) ? pos : 0;
+    playingIndex = playingShuffleOrder[playingShufflePos];
+
+    playFromPlaying(resume);
+  } else {
+    // выключаем шаффл — оставляем тот же трек и позицию
+    const currentId = (playingTracks[playingIndex] && playingTracks[playingIndex].name) ? playingTracks[playingIndex].name : null;
+    setShuffle(false); // режим order
+    if (currentId) {
+      const idx = playingTracks.findIndex(t => t.name === currentId);
+      if (idx !== -1) playingIndex = idx;
+    }
+    playFromPlaying(resume);
+  }
+};
+
+bottomRepeatBtn.onclick = () => { audio.loop = !audio.loop; reflectRepeatUI(); };
+
+/* клики — верх (делают то же) */
+topShuffleBtn.onclick = () => bottomShuffleBtn.click();
+topRepeatBtn.onclick  = () => bottomRepeatBtn.click();
+
+/* первичная синхронизация */
+reflectShuffleUI(); reflectRepeatUI();
+
+// === Media Session API: аппаратные кнопки и системный плеер ===
+if ('mediaSession' in navigator) {
+  // Клики с клавиатуры/гарнитуры
+  navigator.mediaSession.setActionHandler('play',  () => audio.play());
+  navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+  navigator.mediaSession.setActionHandler('previoustrack', () => goPrev());
+  navigator.mediaSession.setActionHandler('nexttrack',     () => goNext());
+  navigator.mediaSession.setActionHandler('seekbackward',  (e) => {
+    const step = e.seekOffset || 10;
+    audio.currentTime = Math.max(0, audio.currentTime - step);
+    updatePositionState();
+  });
+  navigator.mediaSession.setActionHandler('seekforward',   (e) => {
+    const step = e.seekOffset || 10;
+    audio.currentTime = Math.min((audio.duration || Infinity), audio.currentTime + step);
+    updatePositionState();
+  });
+  navigator.mediaSession.setActionHandler('seekto', (e) => {
+    if (typeof e.seekTime === 'number') {
+      if (e.fastSeek && 'fastSeek' in audio) audio.fastSeek(e.seekTime);
+      else audio.currentTime = e.seekTime;
+      updatePositionState();
+    }
+  });
+
+  // Состояние воспроизведения для системной панели
+  function updatePlaybackState() {
+    navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
+  }
+  function updatePositionState() {
+    if ('setPositionState' in navigator.mediaSession) {
+      navigator.mediaSession.setPositionState({
+        duration:  isFinite(audio.duration) ? audio.duration : 0,
+        position:  isFinite(audio.currentTime) ? audio.currentTime : 0,
+        playbackRate: audio.playbackRate || 1
+      });
+    }
+  }
+
+  audio.addEventListener('play',  updatePlaybackState);
+  audio.addEventListener('pause', updatePlaybackState);
+  audio.addEventListener('timeupdate', updatePositionState);
+  audio.addEventListener('loadedmetadata', updatePositionState);
+
+  // Вызывай это при каждом старте трека (добавим в твою playFromPlaying)
+  window._updateTrackMetadata = function(meta) {
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: meta.title || '',
+        artist: meta.artist || '',
+        album: meta.album || '',
+        // artwork опционален, но желателен (HTTPS!). Подставь свою обложку, если есть.
+        artwork: meta.artwork ? [
+          { src: meta.artwork, sizes: '512x512', type: 'image/png' }
+        ] : []
+      });
+    } catch {}
+    updatePlaybackState();
+    updatePositionState();
+  };
+}
+
+
+</script>
+</body>
+</html>
+
+
+
