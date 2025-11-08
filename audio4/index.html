@@ -663,41 +663,37 @@ function reflectRepeatUI(){
 
 /* клики — низ */
 bottomShuffleBtn.onclick = () => {
-  if (!filteredTracks.length) return;
+  if (!filteredTracks.length) return; // нечего мешать
 
   const turningOn = (playingMode !== "shuffle");
-  const currentId =
-    playingTracks[playingIndex] && playingTracks[playingIndex].name
-      ? playingTracks[playingIndex].name
-      : null;
-  const resume = isFinite(audio.currentTime) ? audio.currentTime : 0;
+  const resume = (!Number.isNaN(audio.currentTime)) ? audio.currentTime : 0;
 
   if (turningOn) {
-    // если очереди ещё нет — создаём из видимых и якоримся на случайном
+    // если очередь ещё не создана — создаём из видимых треков
     if (!playingTracks.length) {
       playingTracks = filteredTracks.slice();
+      // СЛУЧАЙНЫЙ стартовый трек (а не первый)
       playingIndex = Math.floor(Math.random() * playingTracks.length);
     }
-    // строим порядок шаффла вокруг текущего трека
-    buildShuffleFromCurrent(playingIndex);
-    playingMode = "shuffle";
+    // включаем шаффл, якорим на текущем треке
+    setShuffle(true); // внутри построит playingShuffleOrder с учётом playingIndex
+    // ставим указатель на позицию текущего трека в шаффл-очереди
+    const pos = playingShuffleOrder.indexOf(playingIndex);
+    playingShufflePos = (pos >= 0) ? pos : 0;
+    playingIndex = playingShuffleOrder[playingShufflePos];
 
-    // НЕ перезагружаем источник — продолжаем
-    playFromPlaying(resume, { skipReload: true });
+    playFromPlaying(resume);
   } else {
-    // режим order — остаёмся на том же треке
-    playingMode = "order";
+    // выключаем шаффл — оставляем тот же трек и позицию
+    const currentId = (playingTracks[playingIndex] && playingTracks[playingIndex].name) ? playingTracks[playingIndex].name : null;
+    setShuffle(false); // режим order
     if (currentId) {
       const idx = playingTracks.findIndex(t => t.name === currentId);
       if (idx !== -1) playingIndex = idx;
     }
-    // тоже без перезагрузки
-    playFromPlaying(resume, { skipReload: true });
+    playFromPlaying(resume);
   }
-
-  reflectShuffleUI();
 };
-
 
 bottomRepeatBtn.onclick = () => { audio.loop = !audio.loop; reflectRepeatUI(); };
 
