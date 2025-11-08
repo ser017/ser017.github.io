@@ -162,7 +162,7 @@
   <div class="main-card">
     <header>
       <div class="header-row">
-        <h1>S</h1>
+        <h1>Audio</h1>
         <div class="search-container">
           <input id="search-input" type="text" placeholder="Поиск музыки..." autocomplete="off" />
         </div>
@@ -183,7 +183,7 @@
       </div>
 
       <div id="now-playing" class="now-playing">Сейчас ничего не играет</div>
-      <audio id="audio-element" preload="auto"></audio>
+      <audio id="audio-element" preload="auto" playsinline></audio>
     </header>
 
     <!-- Плейлисты -->
@@ -234,6 +234,9 @@ let linksData = [];
 let filteredTracks = [];
 let seeking = false;
 let seekingBP = false;
+
+let pendingAutoplay = false;   // нужно автозапустить, но мобилка заблокировала
+let playRetryTimer = null;     // watchdog-повтор
 
 const audio = document.getElementById("audio-element");
 const nowPlaying = document.getElementById("now-playing");
@@ -371,53 +374,137 @@ function updateShuffleAboveBtn() {
   if (!shuffleAboveBtn) return;
   shuffleAboveBtn.style.display = filteredTracks.length > 1 ? '' : 'none';
 }
+
+
 shuffleAboveBtn && (shuffleAboveBtn.onclick = () => {
-  if (!filteredTracks.length) return;
-  playingTracks = filteredTracks.slice();
-  buildShuffleFromCurrent(-1);
-  playingIndex = playingShuffleOrder[playingShufflePos];
-  playingMode = "shuffle";
-  playFromPlaying();
-  reflectShuffleUI();
+  if (filteredTracks.length === 0) return;
+
+  const currentId =
+    playingTracks[playingIndex] && playingTracks[playingIndex].name
+      ? playingTracks[playingIndex].name
+      : null;
+  const resume =
+    audio && !Number.isNaN(audio.currentTime) ? audio.currentTime : 0;
+
+  if (playingMode === "shuffle") {
+    // выключаем shuffle
+    playingMode = "order";
+    if (currentId) {
+      const idx = playingTracks.findIndex((t) => t.name === currentId);
+      if (idx !== -1) playingIndex = idx;
+    }
+    playFromPlaying(resume);
+  } else {
+    // включаем shuffle, не сбрасывая позицию
+    playingTracks = filteredTracks.slice();
+    let anchorIndex = 0;
+    if (currentId) {
+      const idx = playingTracks.findIndex((t) => t.name === currentId);
+      if (idx !== -1) anchorIndex = idx;
+    }
+    playingShuffleOrder = playingTracks
+      .map((_, i) => i)
+      .sort(() => Math.random() - 0.5);
+    const pos = playingShuffleOrder.indexOf(anchorIndex);
+    playingShufflePos = pos >= 0 ? pos : 0;
+    playingIndex = playingShuffleOrder[playingShufflePos];
+    playingMode = "shuffle";
+    playFromPlaying(resume);
+  }
 });
+
 
 function getTrackLinkByName(name) {
   const found = linksData.find(linkObj => linkObj.name === name);
   return found ? found.link : null;
 }
 
-function playFromPlaying() {
+async function tryPlayWithFallback() {
+  // если трек уже может играть — ок
+  try {
+    const p = audio.play();
+    if (p && typeof p.then === 'function') await p;
+    pendingAutoplay = false;
+    setPlayIcon(false);
+    return;
+  } catch (err) {
+    // Мобилка не дала автоплей без жеста — ждём пользовательский Play
+    pendingAutoplay = true;
+    setPlayIcon(true);
+  }
+
+  // Watchdog: если через 1500 мс не пошёл timeupdate, пробуем ещё раз
+  if (playRetryTimer) clearTimeout(playRetryTimer);
+  playRetryTimer = setTimeout(() => {
+    if (pendingAutoplay) {
+      audio.play().catch(()=>{ /* всё ещё заблокировано — ждём жест */ });
+    }
+  }, 1500);
+}
+
+// Если произошёл первый сдвиг времени — точно играем
+audio.addEventListener('timeupdate', () => {
+  if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
+  pendingAutoplay = false;
+  setPlayIcon(false);
+});
+
+// Если буферизация застопорилась — пробуем дёрнуть снова
+audio.addEventListener('stalled', () => {
+  if (!audio.paused && !pendingAutoplay) {
+    audio.play().catch(()=>{ /* молча */ });
+  }
+});
+audio.addEventListener('waiting', () => {
+  // Нормально на мобильных, просто не мешаем
+});
+
+
+
+function playFromPlaying(resumeTime = null) {
   if (playingIndex < 0 || playingIndex >= playingTracks.length) return;
+
   const track = playingTracks[playingIndex];
   const audioSrc = getTrackLinkByName(track.name);
   if (!audioSrc) {
     nowPlaying.textContent = "Ссылка на трек не найдена";
-    const bpTitle = document.getElementById("bp-title");
-    if (bpTitle) bpTitle.textContent = "";
-
     setPlayIcon(true);
     return;
   }
+
+  // сброс ретраев/флагов, если ты их используешь
+  if (typeof playRetryTimer !== 'undefined' && playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
+  if (typeof pendingAutoplay !== 'undefined') pendingAutoplay = false;
+
+  audio.pause();
   audio.src = audioSrc;
-  audio.play();
+  audio.load(); // жёсткий перезапуск потока
+
   nowPlaying.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
-  const bpTitle = document.getElementById("bp-title");
-  if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
 
-  setPlayIcon(false);
-  highlightCurrentPlaying();
-  updateNextPreload();
+  // резюмируем позицию, если её передали
+  const startPlayback = () => {
+    if (resumeTime != null && !Number.isNaN(resumeTime)) {
+      try { audio.currentTime = resumeTime; } catch {}
+    }
+    if (typeof tryPlayWithFallback === 'function') {
+      tryPlayWithFallback();
+    } else {
+      audio.play().catch(()=>{});
+    }
+    highlightCurrentPlaying();
+    if (typeof updateNextPreload === 'function') updateNextPreload();
+  };
 
-  // >>> Media Session: обновляем метаданные системного плеера
-  if (window._updateTrackMetadata) {
-    window._updateTrackMetadata({
-      title: track.title,
-      artist: track.artist,
-      album: track.album || '',
-      artwork: track.cover || 'favicon.png'   // поставь свою обложку, если есть
-    });
+  if (audio.readyState >= 1) {
+    startPlayback();
+  } else {
+    const onMeta = () => { audio.removeEventListener('loadedmetadata', onMeta); startPlayback(); };
+    audio.addEventListener('loadedmetadata', onMeta, { once: true });
   }
 }
+
+
 
 let nextAudio = null;
 function updateNextPreload() {
@@ -451,9 +538,28 @@ function highlightCurrentPlaying() {
 }
 
 function togglePlayPause() {
-  if (audio.paused) { audio.play(); setPlayIcon(false); }
-  else { audio.pause(); setPlayIcon(true); }
+  // Если раньше мобилка заблокировала автоплей — повторим попытку по жесту
+  if (pendingAutoplay) {
+    pendingAutoplay = false;
+    audio.play().then(()=> setPlayIcon(false)).catch(()=> setPlayIcon(true));
+    return;
+  }
+  if (audio.paused) {
+    audio.play().then(()=> setPlayIcon(false)).catch(()=>{
+      // Если вдруг снова блок, отметим и покажем ▶️
+      pendingAutoplay = true;
+      setPlayIcon(true);
+    });
+  } else {
+    audio.pause();
+    setPlayIcon(true);
+  }
 }
+
+
+
+
+
 function setPlayIcon(paused) {
   const icon = paused ? "▶️" : "⏸️";
   playPauseBtn.textContent = icon;
