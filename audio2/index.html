@@ -32,7 +32,7 @@
       }
       .controls{
         display:flex; align-items:center; justify-content:space-between; gap:12px;
-        padding-top: 30px;                                                        /* !!!!!! между плеером и кнопками */
+        padding-top: 20px;                                                        /* !!!!!! между плеером и кнопками */
         padding-bottom: 12px;
       }
       .big-btn{
@@ -183,14 +183,15 @@
       </div>
 
       <div id="now-playing" class="now-playing">Сейчас ничего не играет</div>
-      <audio id="audio-element" preload="auto"></audio>
+      <audio id="audio-element" preload="auto" playsinline></audio>
     </header>
 
     <!-- Плейлисты -->
     <div class="playlists-section">
-        <div class="playlists-header">
-          <button id="show-all-playlists" style="display:none;">Плейлисты</button>
-        </div>
+      <div class="playlists-header">
+        <h2>Плейлисты</h2>
+        <button id="show-all-playlists" style="display:none;">Показать все</button>
+      </div>
       <div id="playlists-list" class="playlists-list"></div>
     </div>
 
@@ -233,6 +234,9 @@ let linksData = [];
 let filteredTracks = [];
 let seeking = false;
 let seekingBP = false;
+
+let pendingAutoplay = false;   // нужно автозапустить, но мобилка заблокировала
+let playRetryTimer = null;     // watchdog-повтор
 
 const audio = document.getElementById("audio-element");
 const nowPlaying = document.getElementById("now-playing");
@@ -385,38 +389,91 @@ function getTrackLinkByName(name) {
   return found ? found.link : null;
 }
 
+async function tryPlayWithFallback() {
+  // если трек уже может играть — ок
+  try {
+    const p = audio.play();
+    if (p && typeof p.then === 'function') await p;
+    pendingAutoplay = false;
+    setPlayIcon(false);
+    return;
+  } catch (err) {
+    // Мобилка не дала автоплей без жеста — ждём пользовательский Play
+    pendingAutoplay = true;
+    setPlayIcon(true);
+  }
+
+  // Watchdog: если через 1500 мс не пошёл timeupdate, пробуем ещё раз
+  if (playRetryTimer) clearTimeout(playRetryTimer);
+  playRetryTimer = setTimeout(() => {
+    if (pendingAutoplay) {
+      audio.play().catch(()=>{ /* всё ещё заблокировано — ждём жест */ });
+    }
+  }, 1500);
+}
+
+// Если произошёл первый сдвиг времени — точно играем
+audio.addEventListener('timeupdate', () => {
+  if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
+  pendingAutoplay = false;
+  setPlayIcon(false);
+});
+
+// Если буферизация застопорилась — пробуем дёрнуть снова
+audio.addEventListener('stalled', () => {
+  if (!audio.paused && !pendingAutoplay) {
+    audio.play().catch(()=>{ /* молча */ });
+  }
+});
+audio.addEventListener('waiting', () => {
+  // Нормально на мобильных, просто не мешаем
+});
+
+
+
 function playFromPlaying() {
   if (playingIndex < 0 || playingIndex >= playingTracks.length) return;
+
   const track = playingTracks[playingIndex];
   const audioSrc = getTrackLinkByName(track.name);
   if (!audioSrc) {
     nowPlaying.textContent = "Ссылка на трек не найдена";
     const bpTitle = document.getElementById("bp-title");
     if (bpTitle) bpTitle.textContent = "";
-
     setPlayIcon(true);
     return;
   }
+
+  // Жёстко сбрасываем, чтобы мобилки не «залипали» на старом источнике
+  if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
+  pendingAutoplay = false;
+
+  audio.pause();
   audio.src = audioSrc;
-  audio.play();
+  audio.currentTime = 0;
+  // Явно перезагружаем метаданные/буфер
+  audio.load();
+
   nowPlaying.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
   const bpTitle = document.getElementById("bp-title");
   if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
 
-  setPlayIcon(false);
-  highlightCurrentPlaying();
-  updateNextPreload();
-
-  // >>> Media Session: обновляем метаданные системного плеера
+  // Media Session (оставляю как у тебя)
   if (window._updateTrackMetadata) {
     window._updateTrackMetadata({
       title: track.title,
       artist: track.artist,
       album: track.album || '',
-      artwork: track.cover || 'favicon.png'   // поставь свою обложку, если есть
+      artwork: track.cover || 'favicon.png'
     });
   }
+
+  // Стартуем с fallback’ами
+  tryPlayWithFallback();
+  highlightCurrentPlaying();
+  updateNextPreload();
 }
+
 
 let nextAudio = null;
 function updateNextPreload() {
@@ -450,9 +507,28 @@ function highlightCurrentPlaying() {
 }
 
 function togglePlayPause() {
-  if (audio.paused) { audio.play(); setPlayIcon(false); }
-  else { audio.pause(); setPlayIcon(true); }
+  // Если раньше мобилка заблокировала автоплей — повторим попытку по жесту
+  if (pendingAutoplay) {
+    pendingAutoplay = false;
+    audio.play().then(()=> setPlayIcon(false)).catch(()=> setPlayIcon(true));
+    return;
+  }
+  if (audio.paused) {
+    audio.play().then(()=> setPlayIcon(false)).catch(()=>{
+      // Если вдруг снова блок, отметим и покажем ▶️
+      pendingAutoplay = true;
+      setPlayIcon(true);
+    });
+  } else {
+    audio.pause();
+    setPlayIcon(true);
+  }
 }
+
+
+
+
+
 function setPlayIcon(paused) {
   const icon = paused ? "▶️" : "⏸️";
   playPauseBtn.textContent = icon;
@@ -631,3 +707,5 @@ if ('mediaSession' in navigator) {
 </script>
 </body>
 </html>
+
+
