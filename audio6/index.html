@@ -162,7 +162,7 @@
   <div class="main-card">
     <header>
       <div class="header-row">
-        <h1>Audio4</h1>
+        <h1>Audio</h1>
         <div class="search-container">
           <input id="search-input" type="text" placeholder="Поиск музыки..." autocomplete="off" />
         </div>
@@ -309,6 +309,55 @@ function buildShuffleFromCurrent(currIndex){
 
 
 
+function updateMediaSession(track) {
+  if (!('mediaSession' in navigator) || !track) return;
+  try {
+    const art = track.cover || 'favicon.png'; // поставь свой путь к обложке, если есть
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title || '',
+      artist: track.artist || '',
+      album: (window.currentPlaylistTitle || ''), // можешь заполнить при выборе плейлиста
+      artwork: [
+        { src: art, sizes: '96x96',   type: 'image/png' },
+        { src: art, sizes: '192x192', type: 'image/png' },
+        { src: art, sizes: '512x512', type: 'image/png' }
+      ]
+    });
+    navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
+
+    // Позиция (не обязательно, но красиво обновляет прогресс)
+    if ('setPositionState' in navigator.mediaSession) {
+      navigator.mediaSession.setPositionState({
+        duration: isFinite(audio.duration) ? audio.duration : 0,
+        position: isFinite(audio.currentTime) ? audio.currentTime : 0,
+        playbackRate: audio.playbackRate || 1
+      });
+    }
+  } catch (_) {}
+}
+
+// поддержка аппаратных кнопок (если ещё не стоит)
+if ('mediaSession' in navigator) {
+  try {
+    navigator.mediaSession.setActionHandler('previoustrack', () => typeof goPrev === 'function' && goPrev());
+    navigator.mediaSession.setActionHandler('nexttrack',     () => typeof goNext === 'function' && goNext());
+    navigator.mediaSession.setActionHandler('play',  () => audio.play().catch(()=>{}));
+    navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+  } catch (_) {}
+}
+
+// лёгкое обновление позиции
+audio.addEventListener('timeupdate', () => {
+  if (!('mediaSession' in navigator)) return;
+  if ('setPositionState' in navigator.mediaSession) {
+    navigator.mediaSession.setPositionState({
+      duration: isFinite(audio.duration) ? audio.duration : 0,
+      position: isFinite(audio.currentTime) ? audio.currentTime : 0,
+      playbackRate: audio.playbackRate || 1
+    });
+  }
+});
+
 
   
 function getQueryParam(name) {
@@ -427,6 +476,7 @@ function endedAutoAdvance() {
 
   playingIndex = nextIdx;
   const tr = playingTracks[playingIndex];
+  updateMediaSession(tr);
   const src = getTrackLinkByName(tr.name);
   if (!src) return;
 
@@ -612,6 +662,10 @@ function playFromPlaying(resumeTime = null, opts = {}) {
     if (np) np.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
     const bpTitle = document.getElementById('bp-title');
     if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
+
+    // ДОБАВЬ:
+    updateMediaSession(track);
+
     if (audio.paused) { audio.play().catch(()=>{}); }
     if (typeof highlightCurrentPlaying === 'function') highlightCurrentPlaying();
     return;
