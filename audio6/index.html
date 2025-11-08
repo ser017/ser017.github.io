@@ -162,7 +162,7 @@
   <div class="main-card">
     <header>
       <div class="header-row">
-        <h1>Audio111</h1>
+        <h1>Audio11</h1>
         <div class="search-container">
           <input id="search-input" type="text" placeholder="Поиск музыки..." autocomplete="off" />
         </div>
@@ -652,6 +652,8 @@ function playFromPlaying(resumeTime = null, opts = {}) {
   if (np) np.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
   const bpTitle = document.getElementById('bp-title');
   if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
+
+  updateMediaSession(track);
 
   if (resumeTime != null && isFinite(resumeTime)) {
     try { audio.currentTime = resumeTime; } catch {}
