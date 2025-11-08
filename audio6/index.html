@@ -162,7 +162,7 @@
   <div class="main-card">
     <header>
       <div class="header-row">
-        <h1>Audio</h1>
+        <h1>Audio111</h1>
         <div class="search-container">
           <input id="search-input" type="text" placeholder="Поиск музыки..." autocomplete="off" />
         </div>
@@ -265,6 +265,7 @@ const bottomRepeatBtn = document.getElementById("bottom-repeat");
 const bpSeek = document.getElementById("bp-seek");
 const bpTimeLeft = document.getElementById("bp-time-left");
 const bpTimeRight = document.getElementById("bp-time-right");
+const bpTitle = document.getElementById("bp-title"); // ← ДОБАВЬ ЭТО
 
 // UI
 const trackListDiv = document.getElementById("track-list");
@@ -429,35 +430,6 @@ function computeNextIndex() {
 }
 
 
-
-function handleEnded() {
-  if (audio.loop) return;
-
-  // вычисляем следующий индекс и продвигаем указатели
-  let nextIdx = -1;
-  if (playingMode === "shuffle") {
-    if (playingShufflePos + 1 < playingShuffleOrder.length) {
-      playingShufflePos++;
-      nextIdx = playingShuffleOrder[playingShufflePos];
-    }
-  } else {
-    if (playingIndex + 1 < playingTracks.length) {
-      nextIdx = playingIndex + 1;
-    }
-  }
-  if (nextIdx === -1) return; // очередь кончилась
-
-  const currentResumeTitle = () => {
-    const tr = playingTracks[nextIdx];
-    nowPlaying && (nowPlaying.textContent = `Сейчас играет: ${tr.artist} — ${tr.title}`);
-    bpTitle && (bpTitle.textContent = `${tr.artist} — ${tr.title}`);
-  };
-
-
-  // fallback: как раньше (меняем src у текущего и play())
-  playingIndex = nextIdx;
-  playFromPlaying(0);
-}
 
 function endedAutoAdvance() {
   if (audio.loop) return;
