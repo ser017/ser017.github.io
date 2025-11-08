@@ -183,7 +183,7 @@
       </div>
 
       <div id="now-playing" class="now-playing">Сейчас ничего не играет</div>
-      <audio id="audio-element" preload="auto" playsinline></audio>
+      <audio id="audio-element" preload="auto" playsinline autoplay></audio>
     </header>
 
     <!-- Плейлисты -->
@@ -463,19 +463,15 @@ function armUserGestureResume() {
 }
 
 function scheduleAutoNext(targetIndex, resume = 0) {
-  // если мы на виду — пробуем сразу
-  if (document.visibilityState === 'visible') {
-    queuedAutoNext = null;
-    playingIndex = targetIndex;
-    playFromPlaying(resume);
-    // если браузер зарубил автоплей — playFromPlaying выставит pendingAutoplay
-    if (pendingAutoplay) armUserGestureResume();
-  } else {
-    // вкладка скрыта: отложим до возврата
-    queuedAutoNext = { index: targetIndex, resume };
-    armUserGestureResume();
-  }
+  // Всегда пробуем сразу
+  queuedAutoNext = null;
+  playingIndex = targetIndex;
+  playFromPlaying(resume);
+
+  // Если браузер зарубил автозапуск — включаем резюм по жесту
+  if (pendingAutoplay) armUserGestureResume();
 }
+
 
 
 function playFromPlaying() {
@@ -650,28 +646,21 @@ audio.addEventListener('pause', ()=>setPlayIcon(true));
 audio.addEventListener('ended', () => {
   if (audio.loop) return;
 
-  // вычисляем следующий индекс без запуска
   let nextIdx = -1;
   if (playingMode === "shuffle") {
     if (playingShufflePos + 1 < playingShuffleOrder.length) {
       nextIdx = playingShuffleOrder[playingShufflePos + 1];
-      playingShufflePos++; // сдвигаем указатель прямо здесь
+      playingShufflePos++;
     }
   } else {
-    if (playingIndex + 1 < playingTracks.length) {
-      nextIdx = playingIndex + 1;
-    }
+    if (playingIndex + 1 < playingTracks.length) nextIdx = playingIndex + 1;
   }
+  if (nextIdx === -1) return;
 
-  if (nextIdx === -1) {
-    // очередь закончилась — ничего не делаем
-    return;
-  }
-
-  // плавный автопереход
-  const resume = 0; // всегда с начала следующего трека
-  scheduleAutoNext(nextIdx, resume);
+  // раньше тут было условие по visibility — убираем
+  scheduleAutoNext(nextIdx, 0);
 });
+
 
 
 
