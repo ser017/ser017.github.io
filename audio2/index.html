@@ -289,7 +289,7 @@ fetch('links.json')
   .then(res => res.json())
   .then(links => {
     linksData = links;
-    return fetch('playlists/playlists.json');
+    return fetch('playlists.json');
   })
   .then(res => res.json())
   .then(playlists => {
@@ -303,7 +303,7 @@ fetch('links.json')
     if (!initialPl && playlistsData.length > 0) initialPl = playlistsData[0];
     if (initialPl) filterTracksByPlaylist(initialPl);
   })
-  .catch(()=>{});
+  .catch(err => console.error('Failed to load data:', err));
 
 function renderPlaylists(playlists) {
   const playlistsList = document.getElementById('playlists-list');
@@ -336,8 +336,10 @@ function filterTracksByPlaylist(playlist) {
     .then(playlistTracks => {
       visibleTracks = playlistTracks;
       renderTracks(playlistTracks);
-    });
+    })
+    .catch(err => console.error('Failed to load tracks:', err));
 }
+
 
 function renderTracks(tracks) {
   filteredTracks = tracks.slice();
@@ -524,7 +526,6 @@ function playFromPlaying(resumeTime = null) {
 
 
 
-let nextAudio = null;
 
 
 function updateNextPreload() {
