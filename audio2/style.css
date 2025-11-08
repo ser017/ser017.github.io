@@ -298,15 +298,3 @@ main {
 }
 
 
-.playlists-header {
-  display: flex;
-  justify-content: flex-start; /* кнопка слева */
-  align-items: center;
-  padding-left: 12px;  /* чтобы не прилипала к краю */
-}
-
-.playlists-header button#show-all-playlists {
-  margin-left: 0 !important;
-}
-
-
