@@ -625,30 +625,34 @@ function reflectRepeatUI(){
 
 /* клики — низ */
 bottomShuffleBtn.onclick = () => {
-  if (!filteredTracks.length) return; // нечего мешать
+  if (!filteredTracks.length) return;
 
   const turningOn = (playingMode !== "shuffle");
-  const resume = (!Number.isNaN(audio.currentTime)) ? audio.currentTime : 0;
+  const currentId =
+    playingTracks[playingIndex] && playingTracks[playingIndex].name
+      ? playingTracks[playingIndex].name
+      : null;
+  const resume = !Number.isNaN(audio.currentTime) ? audio.currentTime : 0;
 
   if (turningOn) {
-    // если очередь ещё не создана — создаём из видимых треков
+    // если очередь ещё не создана — создаём из видимых
     if (!playingTracks.length) {
       playingTracks = filteredTracks.slice();
-      // СЛУЧАЙНЫЙ стартовый трек (а не первый)
+      // стартуем со случайного трека, как ты хотел
       playingIndex = Math.floor(Math.random() * playingTracks.length);
     }
-    // включаем шаффл, якорим на текущем треке
-    setShuffle(true); // внутри построит playingShuffleOrder с учётом playingIndex
-    // ставим указатель на позицию текущего трека в шаффл-очереди
+    // собираем порядок шаффла, «якорим» на текущем треке
+    playingShuffleOrder = playingTracks.map((_, i) => i).sort(() => Math.random() - 0.5);
     const pos = playingShuffleOrder.indexOf(playingIndex);
-    playingShufflePos = (pos >= 0) ? pos : 0;
+    playingShufflePos = pos >= 0 ? pos : 0;
     playingIndex = playingShuffleOrder[playingShufflePos];
+    playingMode = "shuffle";
 
+    // запускаем без перезапуска трека — с той же позиции
     playFromPlaying(resume);
   } else {
-    // выключаем шаффл — оставляем тот же трек и позицию
-    const currentId = (playingTracks[playingIndex] && playingTracks[playingIndex].name) ? playingTracks[playingIndex].name : null;
-    setShuffle(false); // режим order
+    // выключаем шаффл: остаёмся на том же треке и времени
+    playingMode = "order";
     if (currentId) {
       const idx = playingTracks.findIndex(t => t.name === currentId);
       if (idx !== -1) playingIndex = idx;
@@ -656,6 +660,7 @@ bottomShuffleBtn.onclick = () => {
     playFromPlaying(resume);
   }
 };
+
 
 
 
