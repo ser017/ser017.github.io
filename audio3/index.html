@@ -238,8 +238,6 @@ let seekingBP = false;
 let pendingAutoplay = false;   // нужно автозапустить, но мобилка заблокировала
 let playRetryTimer = null;     // watchdog-повтор
 
-let queuedAutoNext = null;   // { index, resume }
-let resumeOnUserGesture = false;
 
 let audio = document.getElementById("audio-element");
 bindAudioEvents(audio);
@@ -359,39 +357,53 @@ function handleEnded() {
   }
   if (nextIdx === -1) return; // очередь кончилась
 
-  // если есть "тихо играющий" nextAudio — просто переключаемся на него
   const currentResumeTitle = () => {
     const tr = playingTracks[nextIdx];
     nowPlaying && (nowPlaying.textContent = `Сейчас играет: ${tr.artist} — ${tr.title}`);
     bpTitle && (bpTitle.textContent = `${tr.artist} — ${tr.title}`);
   };
 
-  if (nextAudio && nextAudio.src) {
-    try { audio.pause(); } catch{}
-    // отвязываем старые события
-    audio.onended = audio.onstalled = audio.ontimeupdate = audio.onloadedmetadata = null;
-
-    // ПЕРЕКЛЮЧАЕМСЯ: новый текущий плеер — это nextAudio
-    audio = nextAudio;
-    nextAudio = null;
-    audio.muted = false;          // снимаем mute — звук пойдёт сразу (он уже играет)
-    playingIndex = nextIdx;
-
-    bindAudioEvents(audio);       // перевязываем все UI-события на новый плеер
-    setPlayIcon(false);
-    currentResumeTitle();
-    return;
-  }
 
   // fallback: как раньше (меняем src у текущего и play())
   playingIndex = nextIdx;
   playFromPlaying(0);
 }
 
+function endedAutoAdvance() {
+  if (audio.loop) return;
+
+  // вычисляем следующий индекс
+  let nextIdx = -1;
+  if (playingMode === "shuffle") {
+    if (playingShufflePos + 1 < playingShuffleOrder.length) {
+      playingShufflePos++;
+      nextIdx = playingShuffleOrder[playingShufflePos];
+    }
+  } else if (playingIndex + 1 < playingTracks.length) {
+    nextIdx = playingIndex + 1;
+  }
+  if (nextIdx === -1) return; // очередь кончилась
+
+  // продвигаем и подготавливаем источник без play()
+  playingIndex = nextIdx;
+  const tr = playingTracks[playingIndex];
+  const src = getTrackLinkByName(tr.name);
+  if (!src) return;
+
+  audio.src = src;
+  audio.currentTime = 0;
+  audio.load(); // autoplay сам запустит
+
+  nowPlaying && (nowPlaying.textContent = `Сейчас играет: ${tr.artist} — ${tr.title}`);
+  if (window._updateTrackMetadata) {
+    _updateTrackMetadata({ title: tr.title, artist: tr.artist, album: tr.album||'', artwork: tr.cover||'favicon.png' });
+  }
+  highlightCurrentPlaying();
+}
+
+
 
 function bindAudioEvents(a) {
-  // снимем старые обработчики у предыдущего audio, если нужно
-  // (ставим через on* чтобы перекрыть)
   a.onloadedmetadata = () => {
     seekbar && (seekbar.max = a.duration || 0);
     currentTimeSpan && (currentTimeSpan.textContent = "0:00");
@@ -407,8 +419,9 @@ function bindAudioEvents(a) {
     if (bpTimeRight) bpTimeRight.textContent = "-" + formatTime(Math.max(0,(a.duration||0)-a.currentTime));
   };
   a.onstalled = () => { if (!a.paused) a.play().catch(()=>{}); };
-  a.onended = handleEnded; // см. ниже
+  a.onended = endedAutoAdvance;   // ← тут наш единственный обработчик
 }
+
 
 
 function filterTracksByPlaylist(playlist) {
@@ -518,45 +531,7 @@ audio.addEventListener('waiting', () => {
   // Нормально на мобильных, просто не мешаем
 });
 
-function armUserGestureResume() {
-  if (resumeOnUserGesture) return;
-  resumeOnUserGesture = true;
 
-  const kick = () => {
-    resumeOnUserGesture = false;
-    document.removeEventListener('touchend', kick, true);
-    document.removeEventListener('click', kick, true);
-    document.removeEventListener('visibilitychange', onVis, true);
-
-    if (queuedAutoNext) {
-      const { index, resume } = queuedAutoNext;
-      queuedAutoNext = null;
-      playingIndex = index;
-      playFromPlaying(resume);   // обычный запуск — внутри есть fallback
-    } else if (pendingAutoplay) {
-      pendingAutoplay = false;
-      audio.play().catch(()=>{ /* если снова не дали — ждём следующий жест */ });
-    }
-  };
-
-  const onVis = () => {
-    if (document.visibilityState === 'visible') kick();
-  };
-
-  document.addEventListener('touchend', kick, true);
-  document.addEventListener('click', kick, true);
-  document.addEventListener('visibilitychange', onVis, true);
-}
-
-function scheduleAutoNext(targetIndex, resume = 0) {
-  // Всегда пробуем сразу
-  queuedAutoNext = null;
-  playingIndex = targetIndex;
-  playFromPlaying(resume);
-
-  // Если браузер зарубил автозапуск — включаем резюм по жесту
-  if (pendingAutoplay) armUserGestureResume();
-}
 
 
 
@@ -669,26 +644,11 @@ function goNext() {
   }
   if (nextIdx === -1) return;
 
-  // если уже есть nextAudio — сразу переключаемся, как в handleEnded
-  if (nextAudio && nextAudio.src) {
-    audio.pause();
-    audio.onended = audio.onstalled = audio.ontimeupdate = audio.onloadedmetadata = null;
-    audio = nextAudio;
-    nextAudio = null;
-    audio.muted = false;
-    playingIndex = nextIdx;
-    bindAudioEvents(audio);
-    setPlayIcon(false);
-    const tr = playingTracks[playingIndex];
-    nowPlaying && (nowPlaying.textContent = `Сейчас играет: ${tr.artist} — ${tr.title}`);
-    bpTitle && (bpTitle.textContent = `${tr.artist} — ${tr.title}`);
-    return;
-  }
-
-  // иначе обычный путь
   playingIndex = nextIdx;
+  // это ручной клик — можно вызывать нормальный запуск
   playFromPlaying(0);
 }
+
 
 
 
