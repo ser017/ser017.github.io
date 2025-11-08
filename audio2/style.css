@@ -308,3 +308,12 @@ main {
 .playlists-header button#show-all-playlists {
   margin-left: 0 !important;
 }
+
+.shuffle-btn.active,
+#bottomShuffle.active,
+#topShuffle.active,
+.player-btn.active {
+  background: #2196f3;
+  color: #fff;
+}
+
