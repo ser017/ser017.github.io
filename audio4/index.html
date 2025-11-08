@@ -162,7 +162,7 @@
   <div class="main-card">
     <header>
       <div class="header-row">
-        <h1>Audio</h1>
+        <h1>Audio5</h1>
         <div class="search-container">
           <input id="search-input" type="text" placeholder="Поиск музыки..." autocomplete="off" />
         </div>
@@ -431,8 +431,7 @@ audio.addEventListener('waiting', () => {
 
 
 
-function playFromPlaying(resumeTime = null, opts = {}) {
-  const skipReload = opts.skipReload === true;
+function playFromPlaying() {
   if (playingIndex < 0 || playingIndex >= playingTracks.length) return;
 
   const track = playingTracks[playingIndex];
@@ -444,43 +443,6 @@ function playFromPlaying(resumeTime = null, opts = {}) {
     setPlayIcon(true);
     return;
   }
-
-  // Если трек не меняется и просили не перезагружать — просто продолжаем
-  if (skipReload && audio.src === audioSrc) {
-    if (resumeTime != null && isFinite(resumeTime)) {
-      try { audio.currentTime = resumeTime; } catch {}
-    }
-    nowPlaying.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
-    const bpTitle = document.getElementById("bp-title");
-    if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
-
-    tryPlayWithFallback();
-    highlightCurrentPlaying();
-    return;
-  }
-
-  // Обычный путь (когда реально меняем трек/источник)
-  if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
-  pendingAutoplay = false;
-
-  audio.pause();
-  audio.src = audioSrc;
-  audio.load();
-
-  nowPlaying.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
-  const bpTitle = document.getElementById("bp-title");
-  if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
-
-  if (resumeTime != null && isFinite(resumeTime)) {
-    try { audio.currentTime = resumeTime; } catch {}
-  } else {
-    try { audio.currentTime = 0; } catch {}
-  }
-
-  tryPlayWithFallback();
-  highlightCurrentPlaying();
-}
-
 
   // Жёстко сбрасываем, чтобы мобилки не «залипали» на старом источнике
   if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
@@ -663,37 +625,41 @@ function reflectRepeatUI(){
 
 /* клики — низ */
 bottomShuffleBtn.onclick = () => {
-  if (!filteredTracks.length) return; // нечего мешать
+  if (!filteredTracks.length) return;
 
   const turningOn = (playingMode !== "shuffle");
-  const resume = (!Number.isNaN(audio.currentTime)) ? audio.currentTime : 0;
+  const currentId =
+    playingTracks[playingIndex] && playingTracks[playingIndex].name
+      ? playingTracks[playingIndex].name
+      : null;
+  const resume = isFinite(audio.currentTime) ? audio.currentTime : 0;
 
   if (turningOn) {
-    // если очередь ещё не создана — создаём из видимых треков
+    // если очереди ещё нет — создаём из видимых и якоримся на случайном
     if (!playingTracks.length) {
       playingTracks = filteredTracks.slice();
-      // СЛУЧАЙНЫЙ стартовый трек (а не первый)
       playingIndex = Math.floor(Math.random() * playingTracks.length);
     }
-    // включаем шаффл, якорим на текущем треке
-    setShuffle(true); // внутри построит playingShuffleOrder с учётом playingIndex
-    // ставим указатель на позицию текущего трека в шаффл-очереди
-    const pos = playingShuffleOrder.indexOf(playingIndex);
-    playingShufflePos = (pos >= 0) ? pos : 0;
-    playingIndex = playingShuffleOrder[playingShufflePos];
+    // строим порядок шаффла вокруг текущего трека
+    buildShuffleFromCurrent(playingIndex);
+    playingMode = "shuffle";
 
-    playFromPlaying(resume);
+    // НЕ перезагружаем источник — продолжаем
+    playFromPlaying(resume, { skipReload: true });
   } else {
-    // выключаем шаффл — оставляем тот же трек и позицию
-    const currentId = (playingTracks[playingIndex] && playingTracks[playingIndex].name) ? playingTracks[playingIndex].name : null;
-    setShuffle(false); // режим order
+    // режим order — остаёмся на том же треке
+    playingMode = "order";
     if (currentId) {
       const idx = playingTracks.findIndex(t => t.name === currentId);
       if (idx !== -1) playingIndex = idx;
     }
-    playFromPlaying(resume);
+    // тоже без перезагрузки
+    playFromPlaying(resume, { skipReload: true });
   }
+
+  reflectShuffleUI();
 };
+
 
 bottomRepeatBtn.onclick = () => { audio.loop = !audio.loop; reflectRepeatUI(); };
 
