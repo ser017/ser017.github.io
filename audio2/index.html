@@ -238,6 +238,13 @@ let seekingBP = false;
 let pendingAutoplay = false;   // нужно автозапустить, но мобилка заблокировала
 let playRetryTimer = null;     // watchdog-повтор
 
+let nextAudio = null;
+let nextNextAudio = null;
+const preconnected = new Set();
+let preloadAbort = null;
+
+
+
 const audio = document.getElementById("audio-element");
 const nowPlaying = document.getElementById("now-playing");
 
@@ -282,7 +289,7 @@ fetch('links.json')
   .then(res => res.json())
   .then(links => {
     linksData = links;
-    return fetch('playlists/playlists.json');
+    return fetch('playlists.json');
   })
   .then(res => res.json())
   .then(playlists => {
@@ -296,7 +303,7 @@ fetch('links.json')
     if (!initialPl && playlistsData.length > 0) initialPl = playlistsData[0];
     if (initialPl) filterTracksByPlaylist(initialPl);
   })
-  .catch(()=>{});
+  .catch(err => console.error('Failed to load data:', err));
 
 function renderPlaylists(playlists) {
   const playlistsList = document.getElementById('playlists-list');
@@ -329,8 +336,10 @@ function filterTracksByPlaylist(playlist) {
     .then(playlistTracks => {
       visibleTracks = playlistTracks;
       renderTracks(playlistTracks);
-    });
+    })
+    .catch(err => console.error('Failed to load tracks:', err));
 }
+
 
 function renderTracks(tracks) {
   filteredTracks = tracks.slice();
@@ -430,70 +439,133 @@ audio.addEventListener('waiting', () => {
 });
 
 
+function originFrom(url) {
+  try { const u = new URL(url, location.href); return u.origin; } catch { return null; }
+}
 
-function playFromPlaying() {
+function preconnectOnce(url) {
+  const o = originFrom(url);
+  if (!o || preconnected.has(o)) return;
+  const link = document.createElement('link');
+  link.rel = 'preconnect';
+  link.href = o;
+  link.crossOrigin = 'anonymous';
+  document.head.appendChild(link);
+  preconnected.add(o);
+}
+
+function makePreloader(src) {
+  const a = new Audio();
+  a.preload = 'auto';
+  a.src = src;
+  // a.load(); // не обязательно, установка src уже стартует буферизацию
+  return a;
+}
+
+function cleanupPreloaders() {
+  if (preloadAbort) { try { preloadAbort.abort(); } catch {} }
+  preloadAbort = new AbortController();
+  if (nextAudio) { nextAudio.src = ''; nextAudio = null; }
+  if (nextNextAudio) { nextNextAudio.src = ''; nextNextAudio = null; }
+}
+
+
+
+
+function playFromPlaying(resumeTime = null) {
   if (playingIndex < 0 || playingIndex >= playingTracks.length) return;
 
   const track = playingTracks[playingIndex];
   const audioSrc = getTrackLinkByName(track.name);
   if (!audioSrc) {
     nowPlaying.textContent = "Ссылка на трек не найдена";
-    const bpTitle = document.getElementById("bp-title");
-    if (bpTitle) bpTitle.textContent = "";
     setPlayIcon(true);
     return;
   }
 
-  // Жёстко сбрасываем, чтобы мобилки не «залипали» на старом источнике
-  if (playRetryTimer) { clearTimeout(playRetryTimer); playRetryTimer = null; }
-  pendingAutoplay = false;
+  // Сброс служебных флагов, если они есть
+  if (typeof playRetryTimer !== 'undefined' && playRetryTimer) {
+    clearTimeout(playRetryTimer);
+    playRetryTimer = null;
+  }
+  if (typeof pendingAutoplay !== 'undefined') pendingAutoplay = false;
 
+  // Полная перезагрузка источника
   audio.pause();
   audio.src = audioSrc;
-  audio.currentTime = 0;
-  // Явно перезагружаем метаданные/буфер
   audio.load();
 
   nowPlaying.textContent = `Сейчас играет: ${track.artist} — ${track.title}`;
-  const bpTitle = document.getElementById("bp-title");
-  if (bpTitle) bpTitle.textContent = `${track.artist} — ${track.title}`;
 
-  // Media Session (оставляю как у тебя)
-  if (window._updateTrackMetadata) {
-    window._updateTrackMetadata({
-      title: track.title,
-      artist: track.artist,
-      album: track.album || '',
-      artwork: track.cover || 'favicon.png'
-    });
+  // Устанавливаем позицию, если нужно
+  if (resumeTime != null && !Number.isNaN(resumeTime)) {
+    try { audio.currentTime = resumeTime; } catch {}
   }
 
-  // Стартуем с fallback’ами
-  tryPlayWithFallback();
+  // Пробуем запустить сразу — не ждём loadedmetadata
+  const tryPlay = () => {
+    audio.play()
+      .then(() => setPlayIcon(false))
+      .catch(() => {
+        // Если autoplay заблокирован — ждём жест пользователя
+        pendingAutoplay = true;
+        setPlayIcon(true);
+      });
+  };
+
+  tryPlay();
+
+  // На случай, если аудио не пошло сразу — повторим при готовности
+  audio.addEventListener('canplay', () => {
+    if (pendingAutoplay) tryPlay();
+  }, { once: true });
+
   highlightCurrentPlaying();
   updateNextPreload();
 }
 
 
-let nextAudio = null;
+
+
+
 function updateNextPreload() {
-  let nextIndex = -1;
-  if (playingMode === "shuffle" && playingShuffleOrder && playingShufflePos + 1 < playingShuffleOrder.length) {
-    nextIndex = playingShuffleOrder[playingShufflePos + 1];
-  } else if (playingMode === "order" && playingIndex + 1 < playingTracks.length) {
-    nextIndex = playingIndex + 1;
+  cleanupPreloaders();
+
+  const mkIdx = (i) => (i >= 0 && i < playingTracks.length) ? i : -1;
+  let n1 = -1, n2 = -1;
+
+  if (playingMode === "shuffle" && playingShuffleOrder.length) {
+    const pos = playingShufflePos;
+    if (pos + 1 < playingShuffleOrder.length) n1 = mkIdx(playingShuffleOrder[pos + 1]);
+    if (pos + 2 < playingShuffleOrder.length) n2 = mkIdx(playingShuffleOrder[pos + 2]);
+  } else {
+    if (playingIndex + 1 < playingTracks.length) n1 = playingIndex + 1;
+    if (playingIndex + 2 < playingTracks.length) n2 = playingIndex + 2;
   }
-  if (nextIndex >= 0 && nextIndex < playingTracks.length) {
-    const nextTrack = playingTracks[nextIndex];
-    const nextSrc = getTrackLinkByName(nextTrack.name);
-    if (nextSrc) {
-      if (nextAudio) nextAudio.src = "";
-      nextAudio = new Audio();
-      nextAudio.src = nextSrc;
-      nextAudio.preload = "auto";
-    }
+
+  const preSrcs = [];
+  if (n1 !== -1) {
+    const t1 = playingTracks[n1];
+    const s1 = getTrackLinkByName(t1.name);
+    if (s1) preSrcs.push(s1);
   }
+  if (n2 !== -1) {
+    const t2 = playingTracks[n2];
+    const s2 = getTrackLinkByName(t2.name);
+    if (s2) preSrcs.push(s2);
+  }
+  if (preSrcs.length === 0) return;
+
+  // Преконнект к доменам заранее
+  preSrcs.forEach(preconnectOnce);
+
+  // Запускаем мягкую буферизацию
+  try {
+    if (preSrcs[0]) nextAudio = makePreloader(preSrcs[0]);
+    if (preSrcs[1]) nextNextAudio = makePreloader(preSrcs[1]);
+  } catch {}
 }
+
 
 function highlightCurrentPlaying() {
   const trackDivs = document.querySelectorAll('#track-list .track');
@@ -625,41 +697,13 @@ function reflectRepeatUI(){
 
 /* клики — низ */
 bottomShuffleBtn.onclick = () => {
-  if (!filteredTracks.length) return; // нечего мешать
-
-  const turningOn = (playingMode !== "shuffle");
-  const resume = (!Number.isNaN(audio.currentTime)) ? audio.currentTime : 0;
-
-  if (turningOn) {
-    // если очередь ещё не создана — создаём из видимых треков
-    if (!playingTracks.length) {
-      playingTracks = filteredTracks.slice();
-      // СЛУЧАЙНЫЙ стартовый трек (а не первый)
-      playingIndex = Math.floor(Math.random() * playingTracks.length);
-    }
-    // включаем шаффл, якорим на текущем треке
-    setShuffle(true); // внутри построит playingShuffleOrder с учётом playingIndex
-    // ставим указатель на позицию текущего трека в шаффл-очереди
-    const pos = playingShuffleOrder.indexOf(playingIndex);
-    playingShufflePos = (pos >= 0) ? pos : 0;
-    playingIndex = playingShuffleOrder[playingShufflePos];
-
-    playFromPlaying(resume);
-  } else {
-    // выключаем шаффл — оставляем тот же трек и позицию
-    const currentId = (playingTracks[playingIndex] && playingTracks[playingIndex].name) ? playingTracks[playingIndex].name : null;
-    setShuffle(false); // режим order
-    if (currentId) {
-      const idx = playingTracks.findIndex(t => t.name === currentId);
-      if (idx !== -1) playingIndex = idx;
-    }
-    playFromPlaying(resume);
+  const turnOn = playingMode !== "shuffle";
+  if (!playingTracks.length && filteredTracks.length) {
+    playingTracks = filteredTracks.slice(); playingIndex = 0;
   }
+  setShuffle(turnOn);
+  if (turnOn) { playingIndex = playingShuffleOrder[playingShufflePos]; playFromPlaying(); }
 };
-
-
-
-
 bottomRepeatBtn.onclick = () => { audio.loop = !audio.loop; reflectRepeatUI(); };
 
 /* клики — верх (делают то же) */
@@ -735,6 +779,5 @@ if ('mediaSession' in navigator) {
 </script>
 </body>
 </html>
-
 
 
