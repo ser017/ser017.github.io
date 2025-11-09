@@ -124,7 +124,7 @@ html, body {
   position: absolute !important;
   top: 50% !important;
   left: 50% !important;
-  transform: translate(-50%, -50%) scale(var(--yt-zoom, 1)) !important;
+  transform: translate(-50%, -50%) scale(var(--yt-zoom, 1.6)) !important;
   transform-origin: center center !important;
 
   /* важно, чтобы не «сжимался» по max-width */
