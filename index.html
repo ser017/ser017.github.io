@@ -28,7 +28,7 @@ div {
 <body style="background-color: #181818">
 
 <div id="elements">
-  <div id="bgndVideo" class="player" data-property="{videoURL:'LDU_Txk06tM', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45, optimizeDisplay:true'}"></div>
+  <div id="bgndVideo" class="player" style="--yt-zoom:1.38" data-property="{videoURL:'LDU_Txk06tM', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45, optimizeDisplay:true'}"></div>
 </div>
 
 <script>$('#elements div').each(function() {
@@ -41,7 +41,7 @@ function praiseTheSun(e){
 	e.style.display = 'none';
 	jQuery("#maincontainer").display = '';
 	jQuery("#maincontainer").fadeTo(3000, 1);
-	jQuery("#bgndVideo").YTPlayer();
+	jQuery(".player:visible").YTPlayer();
 	jQuery('#bgndVideo').on("YTPPlay",function(e){
 		jQuery("#bgndVideo").YTPUnmute();
 	});
