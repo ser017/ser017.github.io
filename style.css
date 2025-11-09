@@ -10,7 +10,7 @@ h1, h2, h3, h4 { color: white; font-weight: normal;}
     height: auto;
     z-index: -100;
     -webkit-transform: translateX(-50%) translateY(-50%);
-    transform: translateX(-50%) translateY(-50%);
+    transform: translateX(-50%) translateY(-50%) scale(var(--yt-zoom, 1.1)) !important;
 }
 #main {
     flex-wrap: wrap;
@@ -100,37 +100,3 @@ iframe {
 
 
 
-/* базовая гигиена */
-html, body {
-  height: 100%;
-  margin: 0;
-}
-
-/* обёртка плагина — на весь экран и режем лишнее */
-.mbYTP_wrapper {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  overflow: hidden !important;
-  z-index: -1; /* фон под контентом */
-}
-
-/* сам iframe по центру, зумом съедаем полосы */
-.mbYTP_wrapper iframe {
-  position: absolute !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) scale(var(--yt-zoom, 1.6)) !important;
-  transform-origin: center center !important;
-
-  /* важно, чтобы не «сжимался» по max-width */
-  width: 120vw !important;   /* чуть больше, чтобы при зуме не оголялись края */
-  height: 120vh !important;
-  max-width: none !important;
-
-  pointer-events: none !important;
-}
