@@ -97,3 +97,20 @@ iframe {
 .YTPOverlay{
 	background: rgba(0, 0, 0, 0.1) url(img/pattern.png);
 }
+:root {
+  --yt-zoom: 1;
+}
+.mbYTP_wrapper {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+.mbYTP_wrapper iframe {
+  width: 100vw !important;
+  height: 100vh !important;
+  transform: scale(var(--yt-zoom)) !important;
+  transform-origin: center center !important;
+}
+
