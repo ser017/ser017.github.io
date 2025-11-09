@@ -99,4 +99,7 @@ iframe {
 }
 
 
+.mbYTP_wrapper iframe {
+  transform: translate(-50%, -50%) scale(var(--yt-zoom, 1.5)) !important;
+}
 
