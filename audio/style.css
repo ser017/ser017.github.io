@@ -298,3 +298,116 @@ main {
 }
 
 
+
+
+
+
+
+
+
+/* === blog-like layout for /audio === */
+:root{
+  --page-bg: #f5f5f7;      /* как в blog f4f4f4*/
+  --page-bg: #f4f4f4;      /* как было f4f4f4*/
+  --max-wrap: 1435px;      /* как в blog */
+  --list-wrap: 1435px;     /* как в blog: ширина центральной “полоски” */
+}
+
+/* внешний фон как в blog */
+body{
+  background: var(--page-bg) !important;
+}
+
+
+.playlists-section {
+  background: var(--page-bg) !important;
+}
+
+
+/* центральная колонка */
+.main-card{
+  max-width: var(--max-wrap);
+  margin: 0 auto;
+  padding: 0 0 56px;        /* низ, чтобы контент “дышал” */
+}
+
+/* шапка должна быть в пределах колонки (не на весь экран) */
+header{
+  overflow: hidden;
+}
+
+/* внутренние отступы делаем такими же “журнальными” */
+.playlists-section,
+main{
+
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* на мобилке чуть уже */
+@media (max-width: 900px){
+  .main-card{ max-width: 100%; }
+  .playlists-section, main{ padding-left: 12px; padding-right: 12px; }
+}
+
+
+
+html{
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+}
+
+.playlists-section{
+  max-width: var(--list-wrap); /* 1400 */
+  margin: 0 auto;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+main{
+  max-width: var(--list-wrap); /* 1200 */
+  margin: 0 auto;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+
+
+.playlists-list{
+  display: flex;
+  gap: 20px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 10px;
+
+  justify-content: center; /* вот это и было нужно */
+}
+
+
+
+.header-row{
+  display: grid;
+  grid-template-columns: 1fr auto 1fr; /* левый блок, центр, правый блок */
+  align-items: center;
+}
+
+.header-row h1{
+  justify-self: start;
+}
+
+.search-container{
+  justify-self: center;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+}
+
+#search-input{
+  margin-left: 0;          /* убираем твой сдвиг */
+  width: 320px;
+  max-width: 90vw;
+}
+
+#search-input::placeholder{
+  text-align: center;
+}

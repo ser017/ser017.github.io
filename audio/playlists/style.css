@@ -262,3 +262,39 @@ main {
     margin-top: 8px;
   }
 }
+
+
+
+
+
+
+
+
+
+/* === blog-like layout for /audio === */
+:root{
+  --page-bg: #f5f5f7;      /* как в blog f4f4f4*/
+  --page-bg: #f4f4f4;      /* как было f4f4f4*/
+  --max-wrap: 1435px;      /* как в blog */
+  --list-wrap: 1435px;     /* как в blog: ширина центральной “полоски” */
+}
+
+/* внешний фон как в blog */
+body{
+  background: var(--page-bg) !important;
+}
+
+
+.playlists-section {
+  background: var(--page-bg) !important;
+}
+
+
+
+/* шапка должна быть в пределах колонки (не на весь экран) */
+header{
+  max-width: var(--max-wrap);
+  margin: 0 auto;
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
+}

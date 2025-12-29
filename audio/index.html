@@ -737,14 +737,18 @@ function goNext() {
   playFromPlaying(0);
 }
 
+const isMobileLike =
+  window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && awaitingAutostart && audio.paused) {
-    awaitingAutostart = false;
-    audio.play().catch(()=>{ /* пользователь ткнёт сам */ });
-  }
-});
+// было: document.addEventListener('visibilitychange', () => { ... });
+if (isMobileLike) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && awaitingAutostart && audio.paused) {
+      awaitingAutostart = false;
+      audio.play().catch(()=>{ /* ок */ });
+    }
+  });
+}
 
 
 prevBtn.onclick = goPrev; nextBtn.onclick = goNext;
@@ -847,7 +851,12 @@ bottomShuffleBtn && (bottomShuffleBtn.onclick = () => {
 });
 
 
-bottomRepeatBtn.onclick = () => { audio.loop = !audio.loop; reflectRepeatUI(); };
+
+function toggleRepeat() { audio.loop = !audio.loop; reflectRepeatUI(); }
+bottomRepeatBtn && (bottomRepeatBtn.onclick = toggleRepeat);
+topRepeatBtn && (topRepeatBtn.onclick = toggleRepeat);
+
+
 
 /* клики — верх (делают то же) */
 topShuffleBtn.onclick = () => bottomShuffleBtn.click();
