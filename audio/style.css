@@ -380,7 +380,6 @@ main{
   overflow-x: auto;
   padding-bottom: 10px;
 
-  justify-content: center; /* вот это и было нужно */
 }
 
 
@@ -411,3 +410,4 @@ main{
 #search-input::placeholder{
   text-align: center;
 }
+
