@@ -537,9 +537,10 @@ audio {
 
 
 /* Картинки кликабельные */
-.post-body img {
-  cursor: zoom-in;
+@media (hover: hover) and (pointer: fine){
+  .post-body img { cursor: zoom-in; }
 }
+
 
 /* Оверлей */
 .img-zoom {
@@ -583,6 +584,3 @@ body.zoom-lock {
   max-height: 96vh !important;
 }
 
-
-.img-zoom { touch-action: manipulation; }
-.img-zoom img { -webkit-user-drag: none; user-select: none; }
