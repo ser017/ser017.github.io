@@ -582,3 +582,7 @@ body.zoom-lock {
   max-width: 98vw !important;
   max-height: 96vh !important;
 }
+
+
+.img-zoom { touch-action: manipulation; }
+.img-zoom img { -webkit-user-drag: none; user-select: none; }
