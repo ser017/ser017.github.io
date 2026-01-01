@@ -417,6 +417,7 @@ a:hover{ text-decoration: underline; }
   height: auto;
   border-radius: 12px;
   display: block;
+
 }
 
 /* Общая подпись под рядом */
@@ -526,4 +527,58 @@ audio {
 .specs p {
   margin: 6px 0;
   line-height: 1.45;
+}
+
+
+
+.post-body figure.figure-sm { margin: 16px 0; text-align: center; }
+
+.post-body figure.figure-sm img { width: min(400px, 100%); margin: 0 auto; border-radius: 14px; }
+
+
+/* Картинки кликабельные */
+.post-body img {
+  cursor: zoom-in;
+}
+
+/* Оверлей */
+.img-zoom {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.78);
+  z-index: 9999;
+  padding: 16px;
+}
+
+
+
+.img-zoom.open {
+  display: flex;
+}
+
+.img-zoom img {
+  max-width: 96vw;
+  max-height: 92vh;
+  width: auto;
+  height: auto;
+  display: block;
+  border-radius: 14px;
+  cursor: zoom-out;
+}
+
+body.zoom-lock {
+  overflow: hidden;
+}
+
+/* FIX: в зуме всегда показываем целиком, без кропа */
+.img-zoom img{
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: 98vw !important;
+  max-height: 96vh !important;
 }
