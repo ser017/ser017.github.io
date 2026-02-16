@@ -11,7 +11,6 @@
     <link href="https://fonts.googleapis.com/css?family=Exo+2" rel="stylesheet">
 
     <style>
-        /* Применяем стиль твоего сайта */
         body {
             background-color: #181818;
             font-family: 'Exo 2', sans-serif !important;
@@ -24,8 +23,6 @@
             color: white;
             user-select: none;
         }
-
-        /* Контейнер мема в стиле #main */
         .meme-container {
             position: relative;
             width: 850px;
@@ -69,11 +66,10 @@
 
         #catGif {
             opacity: 0;
-            transform: translateX(-50%) scale(1.06);
+            transform: translateX(-50%) scale(1.26);
             pointer-events: none;
         }
 
-        /* Твои правильные боковые стрелки */
         .arrows-layer {
             position: absolute;
             top: 0;
@@ -85,12 +81,12 @@
 
         .arrow-path {
             fill: none;
-            stroke: white; /* Делаем белыми под стиль сайта */
+            stroke: white; 
             stroke-width: 6;
             stroke-linecap: round;
         }
 
-        /* Видео скрыто до 10 клика */
+
         #elements { display: none; }
     </style>
 </head>
@@ -132,11 +128,9 @@
             if (isAnimating) return;
             clickCount++;
 
-            // СЮРПРИЗ НА 2 КЛИК
-            if (clickCount === 2) {
-                $('#memeContent').fadeOut(500); // Плавно убираем кота
+            if (clickCount === 10) {
+                $('#memeContent').fadeOut(500);
                 $('#elements').show();
-                // Инициализируем плеер как на твоем рабочем сайте
                 $("#bgndVideo").YTPlayer(); 
                 return;
             }
@@ -172,5 +166,4 @@
         });
     </script>
 </body>
-
 </html>
