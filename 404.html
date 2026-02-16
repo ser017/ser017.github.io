@@ -5,8 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>404</title>
   <script>
-    if (!location.pathname.startsWith('/oiia/')) location.replace('/oiia/');
+    if (location.pathname !== '/oiia/' && location.pathname !== '/oiia') {
+      location.replace('/oiia/');
+    }
   </script>
+
 </head>
 <body></body>
 </html>
+
