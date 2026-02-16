@@ -1,0 +1,86 @@
+
+<head>
+<link rel="icon" href="favicon.ico" type="image/x-icon"/>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.0.0/jquery.min.js"></script>
+<link rel="stylesheet" type="text/css" href="style.css">
+<link rel="stylesheet" type="text/css" href="YTPlayer.min.css">
+<script src="YTPlayer.min.js"></script>
+<link href="https://fonts.googleapis.com/css?family=Exo+2" rel="stylesheet">
+<style>
+	
+a {
+ text-decoration: none; /* Убираем подчёркивание */ 
+color: white;
+}  
+a:hover { 
+text-decoration: none; /* Убираем подчёркивание */ 
+color: #d8d8d8;
+}	
+	
+
+#elements 
+div {
+  display: none;
+}
+	
+</style>
+</head>
+<body style="background-color: #181818">
+
+<div id="elements">
+  <div id="bgndVideo" class="player" data-property="{videoURL:'IHNzOHi8sJs', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'ALZHF5UqnU4', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'6Dh-RL__uN4', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'jATOZhxX1CY', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'JePnQ1gSagc', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'LDU_Txk06tM', containment:'body', autoPlay:true, mute:false, loop:true, startAt:-1, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'8X2kIfS6fb8', containment:'body', autoPlay:true, mute:false, loop:true, startAt:19, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+  <div id="bgndVideo" class="player" data-property="{videoURL:'B9wvTuDC-H0', containment:'body', autoPlay:true, mute:false, loop:true, startAt:2, opacity:1, showControls:false, showYTLogo:false, stopMovieOnBlur:false, quality:'hd1080', vol:'45'}"></div>
+</div>
+
+
+<script>$('#elements div').each(function() {
+	var divs = $('#elements div').get();
+	$(divs.splice(Math.random()*divs.length|0,1)).prependTo('#elements').show();
+});
+</script>
+<script>
+function praiseTheSun(e){
+	e.style.display = 'none';
+	jQuery("#maincontainer").display = '';
+	jQuery("#maincontainer").fadeTo(3000, 1);
+	jQuery("#bgndVideo").YTPlayer();
+	jQuery('#bgndVideo').on("YTPPlay",function(e){
+		jQuery("#bgndVideo").YTPUnmute();
+	});
+}
+function btnOut(e){
+	e.src = "data:image/svg+xml;utf8;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/Pgo8IS0tIEdlbmVyYXRvcjogQWRvYmUgSWxsdXN0cmF0b3IgMTkuMC4wLCBTVkcgRXhwb3J0IFBsdWctSW4gLiBTVkcgVmVyc2lvbjogNi4wMCBCdWlsZCAwKSAgLS0+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmVyc2lvbj0iMS4xIiBpZD0iQ2FwYV8xIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDQxLjk5OSA0MS45OTkiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDQxLjk5OSA0MS45OTk7IiB4bWw6c3BhY2U9InByZXNlcnZlIiB3aWR0aD0iNTEycHgiIGhlaWdodD0iNTEycHgiPgo8cGF0aCBkPSJNMzYuMDY4LDIwLjE3NmwtMjktMjBDNi43NjEtMC4wMzUsNi4zNjMtMC4wNTcsNi4wMzUsMC4xMTRDNS43MDYsMC4yODcsNS41LDAuNjI3LDUuNSwwLjk5OXY0MCAgYzAsMC4zNzIsMC4yMDYsMC43MTMsMC41MzUsMC44ODZjMC4xNDYsMC4wNzYsMC4zMDYsMC4xMTQsMC40NjUsMC4xMTRjMC4xOTksMCwwLjM5Ny0wLjA2LDAuNTY4LTAuMTc3bDI5LTIwICBjMC4yNzEtMC4xODcsMC40MzItMC40OTQsMC40MzItMC44MjNTMzYuMzM4LDIwLjM2MywzNi4wNjgsMjAuMTc2eiIgZmlsbD0iI0ZGRkZGRiIvPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8L3N2Zz4K";
+}
+function btnOver(e){
+	e.src = "data:image/svg+xml;utf8;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/Pgo8IS0tIEdlbmVyYXRvcjogQWRvYmUgSWxsdXN0cmF0b3IgMTkuMC4wLCBTVkcgRXhwb3J0IFBsdWctSW4gLiBTVkcgVmVyc2lvbjogNi4wMCBCdWlsZCAwKSAgLS0+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmVyc2lvbj0iMS4xIiBpZD0iQ2FwYV8xIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDQxLjk5OSA0MS45OTkiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDQxLjk5OSA0MS45OTk7IiB4bWw6c3BhY2U9InByZXNlcnZlIiB3aWR0aD0iMTI4cHgiIGhlaWdodD0iMTI4cHgiPgo8cGF0aCBkPSJNMzYuMDY4LDIwLjE3NmwtMjktMjBDNi43NjEtMC4wMzUsNi4zNjMtMC4wNTcsNi4wMzUsMC4xMTRDNS43MDYsMC4yODcsNS41LDAuNjI3LDUuNSwwLjk5OXY0MCAgYzAsMC4zNzIsMC4yMDYsMC43MTMsMC41MzUsMC44ODZjMC4xNDYsMC4wNzYsMC4zMDYsMC4xMTQsMC40NjUsMC4xMTRjMC4xOTksMCwwLjM5Ny0wLjA2LDAuNTY4LTAuMTc3bDI5LTIwICBjMC4yNzEtMC4xODcsMC40MzItMC40OTQsMC40MzItMC44MjNTMzYuMzM4LDIwLjM2MywzNi4wNjgsMjAuMTc2eiIgZmlsbD0iI0Q4MDAyNyIvPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8L3N2Zz4K";
+}
+</script>
+<br>
+<img id="playbutton" onclick="praiseTheSun(this);" onmouseover="btnOver(this);" onmouseout="btnOut(this);" src="data:image/svg+xml;utf8;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/Pgo8IS0tIEdlbmVyYXRvcjogQWRvYmUgSWxsdXN0cmF0b3IgMTkuMC4wLCBTVkcgRXhwb3J0IFBsdWctSW4gLiBTVkcgVmVyc2lvbjogNi4wMCBCdWlsZCAwKSAgLS0+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmVyc2lvbj0iMS4xIiBpZD0iQ2FwYV8xIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDQxLjk5OSA0MS45OTkiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDQxLjk5OSA0MS45OTk7IiB4bWw6c3BhY2U9InByZXNlcnZlIiB3aWR0aD0iNTEycHgiIGhlaWdodD0iNTEycHgiPgo8cGF0aCBkPSJNMzYuMDY4LDIwLjE3NmwtMjktMjBDNi43NjEtMC4wMzUsNi4zNjMtMC4wNTcsNi4wMzUsMC4xMTRDNS43MDYsMC4yODcsNS41LDAuNjI3LDUuNSwwLjk5OXY0MCAgYzAsMC4zNzIsMC4yMDYsMC43MTMsMC41MzUsMC44ODZjMC4xNDYsMC4wNzYsMC4zMDYsMC4xMTQsMC40NjUsMC4xMTRjMC4xOTksMCwwLjM5Ny0wLjA2LDAuNTY4LTAuMTc3bDI5LTIwICBjMC4yNzEtMC4xODcsMC40MzItMC40OTQsMC40MzItMC44MjNTMzYuMzM4LDIwLjM2MywzNi4wNjgsMjAuMTc2eiIgZmlsbD0iI0ZGRkZGRiIvPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8Zz4KPC9nPgo8L3N2Zz4K"/>
+<div id="maincontainer" style="position: absolute">
+	<div class="tcontainer">
+		<p class="maintext">
+		 <a href="https://ser017.ru/me" target="_blank">ser017.ru</a>
+		</p>
+		<!--
+		<a href="me" target="_blank">ser017.ru</a>
+		<p class="maintext">ser017.ru</p>
+		-->
+	</div>
+	<div class="links">
+		<div class="link travel" onclick="window.open('https://ser017.ru/blog');"></div>
+		<div class="link audio" onclick="window.open('https://ser017.ru/audio');"></div>
+		<div class="link merch" onclick="window.open('https://ser017.ru/store');"></div>	
+	</div>
+</div>
+</body>
+<!--
+href="tg://resolve?domain=ser017"
+
+-->

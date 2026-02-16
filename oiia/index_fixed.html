@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Page Not Found</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon"/>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.0.0/jquery.min.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+
+    <!-- Надёжнее подключить плагин с CDN (для дебага). Если хочешь локально — просто верни свои файлы. -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.mb.YTPlayer/3.3.9/css/jquery.mb.YTPlayer.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mb.YTPlayer/3.3.9/jquery.mb.YTPlayer.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css?family=Exo+2" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #181818;
+            font-family: 'Exo 2', sans-serif !important;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            user-select: none;
+        }
+
+        .meme-container {
+            position: relative;
+            width: 850px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            background-color: rgba(24, 24, 24, 0.7);
+            padding: 40px;
+            border-radius: 15px;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            text-transform: lowercase;
+            margin: 0;
+            z-index: 20;
+            font-weight: normal;
+        }
+
+        .cat-wrapper {
+            position: relative;
+            width: 450px;
+            height: 350px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .cat-img {
+            position: absolute;
+            bottom: 0;
+            max-height: 100%;
+            max-width: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #catGif {
+            opacity: 0;
+            transform: translateX(-50%) scale(1.06);
+            pointer-events: none;
+        }
+
+        .arrows-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .arrow-path {
+            fill: none;
+            stroke: white;
+            stroke-width: 6;
+            stroke-linecap: round;
+        }
+
+        /* Видео скрыто до 2 клика */
+        #elements { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="meme-container" id="memeContent">
+        <h1>i open website</h1>
+
+        <svg class="arrows-layer" viewBox="0 0 850 600">
+            <defs>
+                <marker id="arrowhead" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+                    <path d="M0,0 L5,2.5 L0,5 L0,0" fill="white" />
+                </marker>
+            </defs>
+            <path class="arrow-path" d="M 230 520 Q 50 300 230 80" marker-end="url(#arrowhead)" />
+            <path class="arrow-path" d="M 620 80 Q 800 300 620 520" marker-end="url(#arrowhead)" />
+        </svg>
+
+        <div class="cat-wrapper" id="catClickArea">
+            <img src="cat_static.png" class="cat-img" id="catStatic">
+            <img src="oiia-cat1.gif" class="cat-img" id="catGif">
+        </div>
+
+        <h1>page not found</h1>
+    </div>
+
+    <div id="elements">
+        <!-- Важно: autoPlay:false + mute:true. Инициализируем заранее, а играть/размьютить — внутри клика. -->
+        <a id="bgndVideo" class="player"
+           data-property="{videoURL:'IHNzOHi8sJs', containment:'body', autoPlay:false, mute:true, loop:false, opacity:1, showControls:false, showYTLogo:false, vol:50}">
+        </a>
+    </div>
+
+    <audio id="sound1"><source src="oiia1.mp3" type="audio/mpeg"></audio>
+    <audio id="sound2"><source src="oiia2.mp3" type="audio/mpeg"></audio>
+
+    <script>
+        let clickCount = 0;
+        let isAnimating = false;
+
+        const $player = $("#bgndVideo");
+        let playerReady = false;
+
+        // 1) Грузим YouTube API и собираем плеер заранее (иначе "воспроизведение" случается асинхронно и браузер его блокирует).
+        $(function () {
+            $player.YTPlayer();
+            $player.on("YTPReady", function () {
+                playerReady = true;
+            });
+        });
+
+        function stopCatAudio() {
+            const a1 = document.getElementById('sound1');
+            const a2 = document.getElementById('sound2');
+            a1.pause(); a2.pause();
+        }
+
+        $('#catClickArea').on('click', function() {
+            // Счётчик — ДО isAnimating. Иначе второй клик во время анимации просто "съедается".
+            clickCount++;
+
+            // СЮРПРИЗ НА 2 КЛИК
+            if (clickCount === 2) {
+                isAnimating = false;
+                stopCatAudio();
+
+                $('#memeContent').fadeOut(500);
+                $('#elements').show();
+
+                const startVideo = () => {
+                    // Внутри клика: play + unmute + volume (методы плагина).
+                    $player.YTPPlay();
+                    $player.YTPUnmute();
+                    $player.YTPSetVolume(50);
+                };
+
+                if (playerReady) {
+                    startVideo();
+                } else {
+                    // Если ещё не готов — стартуем сразу, как будет готов.
+                    $player.one("YTPReady", startVideo);
+                }
+
+                return;
+            }
+
+            // Всё, что дальше — только для 1 клика (чтобы не беситься со счётчиком)
+            if (clickCount > 2) return;
+
+            if (isAnimating) return;
+            isAnimating = true;
+
+            const chance = Math.random();
+            let sound, gif, duration;
+
+            if (chance < 0.7) {
+                sound = document.getElementById('sound1');
+                gif = 'oiia-cat1.gif';
+                duration = 1500;
+            } else {
+                sound = document.getElementById('sound2');
+                gif = 'oiia-cat2.gif';
+                duration = 2000;
+            }
+
+            sound.currentTime = 0;
+            sound.play();
+
+            $('#catGif').attr('src', gif + "?t=" + new Date().getTime());
+            $('#catStatic').css('opacity', '0');
+            $('#catGif').css('opacity', '1');
+
+            setTimeout(() => {
+                $('#catGif').css('opacity', '0');
+                $('#catStatic').css('opacity', '1');
+                sound.pause();
+                isAnimating = false;
+            }, duration);
+        });
+    </script>
+</body>
+</html>

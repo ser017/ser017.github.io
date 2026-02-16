@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Page Not Found</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon"/>
+    
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.0.0/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <link rel="stylesheet" type="text/css" href="YTPlayer.min.css">
+    <script src="YTPlayer.min.js"></script>
+    <link href="https://fonts.googleapis.com/css?family=Exo+2" rel="stylesheet">
+
+    <style>
+        /* Темный стиль */
+        body {
+            background-color: #181818; 
+            font-family: 'Exo 2', sans-serif !important;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            user-select: none;
+        }
+
+        /* Обертка для мема (кот + текст + стрелки) */
+        #meme-wrapper {
+            position: relative;
+            width: 850px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 40px;
+            background-color: rgba(24, 24, 24, 0.8); /* Фон, чтобы перекрыть плеер */
+            z-index: 100; /* Мем лежит ПОВЕРХ видео */
+            border-radius: 15px;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            text-transform: lowercase;
+            margin: 0;
+            font-weight: normal;
+        }
+
+        /* Кот */
+        .cat-box {
+            position: relative;
+            width: 450px;
+            height: 350px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .cat-img {
+            position: absolute;
+            bottom: 0;
+            max-height: 100%;
+            max-width: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Стрелки */
+        .arrows-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .arrow-line {
+            fill: none;
+            stroke: white;
+            stroke-width: 6;
+            stroke-linecap: round;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="meme-wrapper">
+        <h1>i open website</h1>
+
+        <svg class="arrows-svg" viewBox="0 0 850 600">
+            <defs>
+                <marker id="arrowhead" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+                    <path d="M0,0 L5,2.5 L0,5 L0,0" fill="white" />
+                </marker>
+            </defs>
+            <path class="arrow-line" d="M 230 520 Q 50 300 230 80" marker-end="url(#arrowhead)" />
+            <path class="arrow-line" d="M 620 80 Q 800 300 620 520" marker-end="url(#arrowhead)" />
+        </svg>
+
+        <div class="cat-box" id="catClickArea">
+            <img src="cat_static.png" class="cat-img" id="catStatic">
+        </div>
+
+        <h1>page not found</h1>
+    </div>
+
+    <div id="bgndVideo" class="player" 
+         data-property="{
+             videoURL:'IxX_QHay02M', 
+             containment:'body', 
+             autoPlay:false, 
+             mute:false, 
+             startAt:0, 
+             opacity:1, 
+             showControls:false, 
+             showYTLogo:false, 
+             vol:100
+         }">
+    </div>
+
+    <script>
+        $(function(){
+            // Инициализация плеера (он загрузится на фон, но будет на паузе)
+            $("#bgndVideo").YTPlayer();
+
+            // Клик по коту -> Запуск видео
+            $('#catClickArea').on('click', function() {
+                
+                // 1. Прячем мем
+                $('#meme-wrapper').fadeOut(500);
+                
+                // 2. Включаем видео (аналог клика по стрелочке на твоем сайте)
+                $('#bgndVideo').YTPPlay();
+                
+            });
+        });
+    </script>
+</body>
+</html>
