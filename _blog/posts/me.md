@@ -4,6 +4,7 @@ date: 2025-11-01
 hero: false
 author: "Ser017"
 listed: false
+permalink: /me/index.html
 ---
 
 
