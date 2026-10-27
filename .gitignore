@@ -5,3 +5,5 @@ _site/
 *.log
 .env
 .env.*
+
+_build/

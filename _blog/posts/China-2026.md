@@ -1,11 +1,17 @@
 ---
 title: "Китай"
-date: 2026-10-17
+date: 2026-10-27
 tags: ["cn","hk"]
 cover: "/assets/images/DJI_20260922111258_0031_D_preview.jpeg"
 hero: true
 author: "Ser017"
 ---
+
+<video controls loop muted playsinline preload="metadata" aria-label="Видео к статье о Китае" style="display:block;max-width:100%;height:auto;margin:0 auto 24px;border-radius:14px;">
+  <source src="/assets/video/QVRGkh.mp4" type="video/mp4">
+  <a href="/assets/video/QVRGkh.mp4">Открыть видео</a>
+</video>
+
 
 
 Первое(и последнее) путешествие в 2026 году.
