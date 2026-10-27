@@ -1,0 +1,15 @@
+---
+title: Главная
+layout: layout.njk
+permalink: /blog/index.html
+---
+<section>
+  <!-- <h1>здесь потом можно дописать любую хуйню</h1> -->
+  <div class="list">
+    {%- for post in collections.posts -%}
+      {% if post.data.listed != false %}
+        {% include "post-card.njk" %}
+      {% endif %}
+    {%- endfor -%}
+  </div>
+</section>

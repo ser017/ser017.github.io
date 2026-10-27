@@ -1,0 +1,13 @@
+---
+title: Теги
+layout: layout.njk
+permalink: /blog/tags/index.html
+---
+<section class="tags-index">
+  <h1>Все теги</h1>
+  <div class="tags-cloud">
+    {% for tag in collections.tagList %}
+      <a class="tag-chip" href="{{ ('/blog/tags/' + (tag | slug) + '/') | url }}">{{ tag }} <span class="count">{{ collections[tag] | length }}</span></a>
+    {% endfor %}
+  </div>
+</section>

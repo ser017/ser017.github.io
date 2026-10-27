@@ -1,0 +1,13 @@
+{
+  "name": "my-articles-site",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "eleventy --serve",
+    "build": "node scripts/build.cjs",
+    "publish": "node scripts/publish.cjs"
+  },
+  "devDependencies": {
+    "@11ty/eleventy": "^2.0.0"
+  }
+}

@@ -1,2 +1,7 @@
 blog/assets/*.zip
 *.zip
+node_modules/
+_site/
+*.log
+.env
+.env.*
