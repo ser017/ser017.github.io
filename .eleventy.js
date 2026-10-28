@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const markdownIt = require('markdown-it');
 module.exports = function (config) {
+  config.addShortcode('articlePreview', require('./scripts/article-preview.cjs'));
   const excluded = new Set(['node_modules', 'scripts', 'blog', 'me']);
   for (const entry of fs.readdirSync(__dirname, { withFileTypes: true })) {
     if (/^[._]/.test(entry.name) || excluded.has(entry.name)) continue;
