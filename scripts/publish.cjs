@@ -23,7 +23,7 @@ if (ahead.status !== 0) {
 }
 const build = spawnSync(process.execPath, [path.join(__dirname, 'build.cjs')], { stdio: 'inherit' });
 if (build.status !== 0) process.exit(build.status || 1);
-git(['add', '--', '_blog', '.eleventy.js', 'package.json', 'package-lock.json', 'scripts', 'README-BLOG.md', '.gitignore', '.nojekyll', 'blog', 'me', 'index.html', 'favicon.ico', 'audio/index.html', 'store/index.html', '404/index.html', '404.html']);
+git(['add', '--', '_blog', '.eleventy.js', 'package.json', 'package-lock.json', 'scripts', 'README-BLOG.md', '.gitignore', '.nojekyll', 'blog', 'me', 'index.html', 'favicon.ico', 'audio', 'store/index.html', '404/index.html', '404.html']);
 if (git(['diff', '--cached', '--name-only'], true)) {
   const message = process.argv.slice(2).join(' ') || `Обновление блога ${new Date().toLocaleDateString('sv-SE')}`;
   git(['commit', '-m', message]);

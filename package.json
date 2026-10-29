@@ -5,7 +5,8 @@
   "scripts": {
     "start": "eleventy --serve",
     "build": "node scripts/build.cjs",
-    "publish": "node scripts/publish.cjs"
+    "publish": "node scripts/publish.cjs",
+    "test:audio": "node --test audio/tests/player.test.mjs"
   },
   "devDependencies": {
     "@11ty/eleventy": "^2.0.0",
