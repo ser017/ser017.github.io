@@ -265,13 +265,27 @@ author: "Ser017"
 
 Очень много контента
 
-#### Вышка хайповая
+#### Телебашня (добавить фото)
 
+Классное место для фото
 
-#### Зоопарк
+#### Зоопарк (добавить фото)
 
+Много разных животных
 
-#### Стеклянный мост и рафтинг
+#### Gun Long Skywalk
+
+Топовая экскурсия, обязательно брать рафтинг и спуск по трассе 
+
+<figure class="figure-video">
+  <button class="video-toggle" type="button" data-video-toggle aria-label="Воспроизвести видео" aria-pressed="false" aria-describedby="china-video-caption">
+    <video loop muted playsinline preload="metadata" disablepictureinpicture disableremoteplayback>
+      <source src="/assets/video/OWFEkR.mp4" type="video/mp4">
+    </video>
+  </button>
+  <figcaption id="china-video-caption">Рафтинг</figcaption>
+</figure>
+
 
 
 #### Еда
@@ -287,9 +301,23 @@ author: "Ser017"
   <figcaption>Разный хавчик</figcaption>
 </figure>
 
-
-
 #### Ещё
+
+В городе куча красивых храмов
+
+<div class="images-row">
+  <figure>
+    <img src="/assets/images/china2026/2026-09-18 10-47-21_preview.jpeg">
+    <figcaption>Temple of the Six Banyan Trees</figcaption>
+  </figure>
+
+  <figure>
+    <img src="/assets/images/china2026/templ.png">
+    <figcaption>Bright Filial Piety Temple</figcaption>
+  </figure>
+</div>
+
+
 
 <figure class="images-group">
   <div class="images-grid">
@@ -303,30 +331,102 @@ author: "Ser017"
 
 ## Пекин
 
-Столица как обычно оказалась не самым лучшим городом страны - что ожидаемо
+Столица как обычно оказалась не самым лучшим городом страны - что ожидаемо.
 
-Тем не менее было интересно
+Тем не менее было интересно.
 
-#### Баня
+#### Баня номер 9
 
+Место, где можно находить абсолютно круглосуточно хоть целый год(но зачем). 
+А можно приобрести билет на 6 часов(50$) и приобрести шведский стол на ужин + безлимитный фруктовый стол, безлимитные напитки и мороженое.
+
+
+
+<figure class="images-group">
+  <div class="images-grid">
+    <img src="/assets/images/china2026/hav1.png">
+    <img src="/assets/images/china2026/PXL_20260920_130204203_preview.jpeg">
+    <img src="/assets/images/china2026/PXL_20260920_170103455_preview.jpeg">
+
+  </div>
+  <figcaption>Разный хавчик</figcaption>
+</figure>
+
+Там конечно есть ещё баня и сауна, но они слабые.
+
+<figure class="images-group">
+  <div class="images-row">
+    <img src="/assets/images/china2026/PXL_20260920_170345306_preview.jpeg" class="post-image">
+    <img src="/assets/images/china2026/PXL_20260920_134927152_preview.jpeg" class="post-image">
+  </div>
+
+  <figcaption>Интерьер</figcaption>
+</figure>
 
 #### Запретный город
 
-Искуственный водоём выглядит не оч красиво
-сказать что похож на басингсе
+Большое пространное место с мини музеями внутри.
+Непросто найти выход.
+Я не оценил, но внутри можно сделать красивые фото с красивыми традиционными китайскими зданиями. 
 
-#### Храм неба
+<div class="images-row">
+  <figure>
+    <img src="/assets/images/china2026/zg1.png">
+    <figcaption>Вид с главного входа</figcaption>
+  </figure>
 
-храм жатвы
+  <figure>
+    <img src="/assets/images/china2026/bss.webp">
+    <figcaption>Что-то он мне напоминает...</figcaption>
+  </figure>
+</div>
 
-#### Еда
 
-жуки
+Искуственный водоём квадратной формы выглядит не оч красиво. Там даже живности не видно.
 
-#### Ещё куча достопримечательностей
+#### Храм неба 
 
-храм с барабанами например
+<div class="images-row">
+  <figure>
+    <img src="/assets/images/china2026/PXL_20260922_062604656_preview.jpeg">
+    <figcaption>Храм жатвы</figcaption>
+  </figure>
 
-## Итог
+  <figure>
+    <img src="/assets/images/china2026/PXL_20260922_075715400_preview.jpeg">
+    <figcaption>Штука на которую надо встать и поднять руки для благословления</figcaption>
+  </figure>
+</div>
+
+
+
+
+#### Еда 
+
+Не думал, что когда-то буду есть насекомых, но решился попробовать раз поеду в Китай.
+Оказалось, они не склизкие и не тошнотные. По крайней мере то, что попробовал я.
+Они были хрустящие. Скорее как чипсы.
+Особенно скорпион, там одна оболочка и мышц мало. В личинках шелкопряда побольше.
+
+<div class="images-grid figures">
+  <figure>
+    <img src="/assets/images/china2026/scorp.png">
+    <figcaption>Скорпион(клешни есть нельзя)</figcaption>
+  </figure>
+
+  <figure>
+    <img src="/assets/images/china2026/PXL_20260921_112216017_preview.jpeg">
+    <figcaption>Жуки</figcaption>
+  </figure>
+
+  <figure>
+    <img src="/assets/images/china2026/PXL_20260921_105550003_preview.jpeg">
+    <figcaption>Ассортимент</figcaption>
+  </figure>
+</div>
+
+
+
+## Итог (доделать)
 
 Тут добавить выводы и в целом наблюдения про китай и китайцев

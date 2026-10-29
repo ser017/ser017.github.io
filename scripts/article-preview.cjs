@@ -12,5 +12,5 @@ module.exports = function articlePreview(url, description = '') {
   const summary = escape(description || post.data.excerpt);
   const cover = post.data.cover && String(post.data.cover).replace(/^\/assets\//, '/blog/assets/');
   const image = cover ? `<img class="article-preview__image no-zoom" src="${escape(cover)}" alt="" loading="lazy" decoding="async">` : '';
-  return `<a class="article-preview${cover ? '' : ' article-preview--text'}" href="${escape(post.url)}">${image}<span class="article-preview__content"><span class="article-preview__title">${title}</span>${summary ? `<span class="article-preview__summary">${summary}</span>` : ''}</span></a>`;
+  return `<a class="article-preview${cover ? '' : ' article-preview--text'}" href="${escape(post.url)}" target="_blank" rel="noopener noreferrer">${image}<span class="article-preview__content"><span class="article-preview__title">${title}</span>${summary ? `<span class="article-preview__summary">${summary}</span>` : ''}</span></a>`;
 };
