@@ -1,7 +1,4 @@
 (() => {
-  // Только десктоп: есть hover и точный указатель (мышь/трекпад)
-  const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-  if (!isDesktop) return;
 
   const overlay = document.createElement("div");
   overlay.className = "img-zoom";
@@ -11,7 +8,7 @@
   const overlayImg = overlay.querySelector("img");
 
   function openZoom(img) {
-    const src = img.currentSrc || img.src;
+    const src = img.dataset.full || img.currentSrc || img.src;
     overlayImg.src = src;
     overlayImg.alt = img.alt || "";
     overlay.classList.add("open");
@@ -21,7 +18,7 @@
   function closeZoom() {
     overlay.classList.remove("open");
     document.body.classList.remove("zoom-lock");
-    overlayImg.src = "";
+    overlayImg.removeAttribute("src");
   }
 
   document.addEventListener("click", (e) => {

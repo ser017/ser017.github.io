@@ -48,5 +48,8 @@ module.exports = function (config) {
     return content.replace(/\b(src|href|poster)=(['"])\/assets\//g, '$1=$2/blog/assets/')
       .replace(/\bsrcset=(['"])(.*?)\1/gs, (_, quote, value) => `srcset=${quote}${value.replace(/(^|,\s*)\/assets\//g, '$1/blog/assets/')}${quote}`);
   });
+  const optimizeImages = require('./scripts/optimize-images.cjs');
+  config.on('eleventy.before', () => optimizeImages.reset());
+  config.addTransform('optimize-images', optimizeImages);
   return { dir: { input: '_blog', includes: '_includes', data: '_data', output: '_site' }, pathPrefix: '/', markdownTemplateEngine: 'njk', htmlTemplateEngine: 'njk', templateFormats: ['md', 'njk', 'html'] };
 };
