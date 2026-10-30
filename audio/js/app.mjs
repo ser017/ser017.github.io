@@ -157,6 +157,11 @@ function renderQueue() {
 }
 for (const id of ['now-playing', 'bp-title']) $(id).addEventListener('click', () => { if (!queueDialog.open) { queueDialog.showModal(); renderQueue(); } });
 $('queue-close').addEventListener('click', () => queueDialog.close());
+queueDialog.addEventListener('pointerdown', event => {
+  if (event.target !== queueDialog) return;
+  const rect = queueDialog.getBoundingClientRect();
+  if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) queueDialog.close();
+});
 function renderPlayer() {
   const track = player.track;
   const title = track ? `${track.artist} — ${track.title}` : '';
