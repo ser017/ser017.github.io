@@ -182,7 +182,7 @@
         <span id="current-time" class="player-time">0:00</span>
       <div class="volume-control"><button type="button" id="volume-mute" class="volume-button" aria-label="Выключить звук">🔊</button><input id="volume" type="range" min="0" max="100" value="100" step="1" aria-label="Громкость"><output id="volume-value" for="volume">100%</output></div></div>
 
-      <div class="playback-info"><div id="now-playing" class="now-playing">Сейчас ничего не играет</div>
+      <div class="playback-info"><button type="button" id="now-playing" class="now-playing queue-open" aria-haspopup="dialog">Сейчас ничего не играет</button>
       <div class="playback-feedback"><p id="playback-status" role="status" aria-live="polite"></p><button id="playback-retry" type="button" hidden>Повторить</button></div></div><audio id="audio-element" preload="auto" playsinline></audio>
     </header>
 
@@ -217,9 +217,15 @@
       <button id="bottom-next" class="big-btn" title="Следующий" aria-label="Следующий трек">⏭️</button>
       <button id="bottom-repeat" class="big-btn toggle" title="Зациклить" aria-label="Повтор трека">🔁</button>
     </div>
-    <div id="bp-title" class="bp-title"> </div>
+    <button type="button" id="bp-title" class="bp-title queue-open" aria-haspopup="dialog">Выберите трек</button>
   </div>
 
+<dialog id="queue-dialog" aria-labelledby="queue-title">
+  <div class="queue-header"><h2 id="queue-title">Очередь воспроизведения</h2><button type="button" id="queue-close" aria-label="Закрыть очередь">✕</button></div>
+  <p class="queue-caption">Сейчас играет</p><p id="queue-current"></p>
+  <p class="queue-caption">Далее</p><p class="queue-hint">Перетаскивайте треки, чтобы изменить порядок.</p>
+  <ol id="queue-list"></ol><p id="queue-empty" hidden>В очереди больше нет треков.</p>
+</dialog>
 <script type="module" src="js/app.mjs"></script>
 </body>
 </html>

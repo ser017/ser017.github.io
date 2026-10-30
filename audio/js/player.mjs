@@ -98,6 +98,14 @@ export class AudioPlayer extends EventTarget {
     if (!this.repeat && this.wantPlay && !this.audio.paused) this.prepareNext();
     this.notify();
   }
+  updateQueue(action, ...args) {
+    if (!this.queue[action](...args)) return;
+    this.buffer.cancel(); this.prefetchFor = null;
+    if (!this.repeat && this.wantPlay && !this.audio.paused && this.audio.currentTime >= 3) this.prepareNext();
+    this.notify();
+  }
+  removeUpcoming(index) { this.updateQueue('removeUpcoming', index); }
+  moveUpcoming(from, to) { this.updateQueue('moveUpcoming', from, to); }
   prepareNext() {
     const next = this.repeat ? null : this.queue.nextTrack;
     if (!next || this.prefetchFor === next.name) return;

@@ -375,7 +375,8 @@ main{
 
 .playlists-list{
   display: flex;
-  gap: 20px;
+  justify-content: space-between;
+  gap: 16px;
   flex-wrap: nowrap;
   overflow-x: auto;
   padding-bottom: 10px;

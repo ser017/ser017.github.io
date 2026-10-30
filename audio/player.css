@@ -39,3 +39,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid #3b82f6; outline-
   .playback-info { min-height: 20px; margin: 4px 12px 0; justify-content: flex-end; }
   .playback-feedback { max-width: 100%; }
 }
+
+/* Очередь воспроизведения */
+.queue-open { cursor: pointer; color: inherit; font: inherit; background: transparent; border: 0; padding: 0; text-align: left; }
+#bp-title.queue-open { display: block; width: 100%; text-align: center; color: #fff; pointer-events: auto; }
+#queue-dialog { box-sizing: border-box; width: min(640px, calc(100% - 24px)); max-height: min(80vh, 760px); border: 0; border-radius: 14px; padding: 20px; background: #f4f4f4; color: #222; }
+#queue-dialog::backdrop { background: #0009; }
+.queue-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.queue-header h2 { margin: 0; font-size: 1.25rem; }
+.queue-header button, .queue-row button { border: 0; border-radius: 8px; background: #e5e5e5; color: #222; min-width: 36px; min-height: 36px; font-size: 18px; cursor: pointer; }
+.queue-row button:disabled { opacity: .35; cursor: default; }
+.queue-caption { font-weight: bold; margin: 20px 0 8px; }
+#queue-current { margin: 0; overflow-wrap: anywhere; }
+.queue-hint { color: #555; font-size: 14px; margin: 0 0 10px; }
+#queue-list { list-style: none; margin: 0; padding: 0; }
+.queue-row { display: flex; align-items: center; gap: 6px; padding: 8px; margin-bottom: 6px; border-radius: 8px; background: #fff; }
+.queue-track { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#queue-empty { color: #555; }
+
+.queue-row .queue-handle { background: transparent; color: #777; cursor: grab; touch-action: none; }
+.queue-row.queue-dragging { opacity: .55; }

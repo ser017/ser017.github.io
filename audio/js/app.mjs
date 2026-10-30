@@ -80,11 +80,12 @@ async function initialize() {
   trackMessage('Загрузка музыки…');
   try {
     const lists = await catalog.load();
-    $('playlists-list').replaceChildren(...lists.slice(0, 7).map(list => {
+    const visiblePlaylistCount = 8;
+    $('playlists-list').replaceChildren(...lists.slice(0, visiblePlaylistCount).map(list => {
       const button = playlistButton(list, selectPlaylist); button.dataset.playlistId = list.list; return button;
     }));
     const all = $('show-all-playlists');
-    all.style.display = lists.length > 7 ? '' : 'none'; all.onclick = () => { location.href = 'playlists/'; };
+    all.style.display = lists.length > visiblePlaylistCount ? '' : 'none'; all.onclick = () => { location.href = 'playlists/'; };
     const requested = new URL(location.href).searchParams.get('playlist');
     const initial = lists.find(list => list.list === requested) || lists[0];
     if (initial) await selectPlaylist(initial); else trackMessage('Плейлисты пока не добавлены.');
@@ -96,6 +97,66 @@ function togglePlayback() {
   if (!player.track) player.start(filtered, filtered.find(track => track.url)?.name);
   else player.toggle();
 }
+const queueDialog = $('queue-dialog');
+let draggedQueueIndex = null;
+function renderQueue() {
+  if (!queueDialog.open || draggedQueueIndex !== null) return;
+  const track = player.track;
+  $('queue-current').textContent = track ? `${track.artist} — ${track.title}` : 'Трек не выбран';
+  const upcoming = player.queue.upcoming;
+  $('queue-empty').hidden = upcoming.length > 0;
+  const fragment = document.createDocumentFragment();
+  upcoming.forEach((item, index) => {
+    const row = document.createElement('li'); row.className = 'queue-row';
+    const handle = document.createElement('button'); handle.type = 'button'; handle.className = 'queue-handle'; handle.textContent = '☰';
+    handle.setAttribute('aria-label', `Переместить трек: ${item.artist} — ${item.title}`);
+    handle.title = 'Перетащить трек';
+    handle.addEventListener('keydown', event => {
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+      event.preventDefault(); const target = index + (event.key === 'ArrowUp' ? -1 : 1);
+      if (target < 0 || target >= upcoming.length) return;
+      player.moveUpcoming(index, target); $('queue-list').children[target]?.querySelector('.queue-handle')?.focus();
+    });
+    row.append(handle);
+    const label = document.createElement('span'); label.className = 'queue-track'; label.textContent = `${item.artist} — ${item.title}`; row.append(label);
+    const addButton = (text, title, disabled, action) => {
+      const button = document.createElement('button'); button.type = 'button'; button.textContent = text;
+      button.setAttribute('aria-label', `${title}: ${item.artist} — ${item.title}`); button.title = title; button.disabled = disabled;
+      button.onclick = () => { action(); const rows = $('queue-list').children; const target = rows[Math.min(index, rows.length - 1)]; target?.querySelector('button:not(:disabled)')?.focus(); };
+      row.append(button);
+    };
+    addButton('↑', 'Воспроизвести следующим', index === 0, () => player.moveUpcoming(index, 0));
+    addButton('✕', 'Удалить из очереди', false, () => player.removeUpcoming(index));
+    let pointerStart = null;
+    row.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || (event.target.closest('button') && !event.target.closest('.queue-handle'))) return;
+      if (event.pointerType === 'touch' && !event.target.closest('.queue-handle')) return;
+      pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      draggedQueueIndex = index; row.setPointerCapture(event.pointerId);
+      if (event.pointerType === 'touch') event.preventDefault();
+    });
+    row.addEventListener('pointermove', event => {
+      if (!pointerStart || event.pointerId !== pointerStart.id) return;
+      if (Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) > 5) row.classList.add('queue-dragging');
+    });
+    function finishPointer(event, cancelled = false) {
+      if (!pointerStart || event.pointerId !== pointerStart.id) return;
+      const moved = row.classList.contains('queue-dragging');
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('.queue-row');
+      const targetIndex = [...$('queue-list').children].indexOf(target);
+      pointerStart = null; draggedQueueIndex = null; row.classList.remove('queue-dragging');
+      if (!cancelled && moved && targetIndex >= 0 && targetIndex !== index) player.moveUpcoming(index, targetIndex);
+      else renderQueue();
+    }
+    row.addEventListener('pointerup', event => finishPointer(event));
+    row.addEventListener('pointercancel', event => finishPointer(event, true));
+    row.addEventListener('lostpointercapture', event => finishPointer(event, true));
+    fragment.append(row);
+  });
+  $('queue-list').replaceChildren(fragment);
+}
+for (const id of ['now-playing', 'bp-title']) $(id).addEventListener('click', () => { if (!queueDialog.open) { queueDialog.showModal(); renderQueue(); } });
+$('queue-close').addEventListener('click', () => queueDialog.close());
 function renderPlayer() {
   const track = player.track;
   const title = track ? `${track.artist} — ${track.title}` : '';
@@ -120,7 +181,7 @@ function renderPlayer() {
   else if (player.status === 'loading') setStatus('Загрузка трека…');
   else if (player.status === 'ended') setStatus('Плейлист закончился.');
   else setStatus('');
-  highlight(); syncMediaSession(); updateProgress();
+  highlight(); syncMediaSession(); updateProgress(); renderQueue();
 }
 function updateProgress() {
   const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;

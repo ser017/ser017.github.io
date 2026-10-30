@@ -88,3 +88,18 @@ test('prefetch enforces its memory limit and a failure is non-fatal', async () =
   const offline = new NextTrackBuffer({ fetcher: async () => { throw new Error('Offline'); } });
   await offline.prepare(tracks[0]); assert.equal(offline.ready, null);
 });
+
+test('editing upcoming tracks changes playback order and cannot remove the current track', async () => {
+  const audio = new FakeAudio(), buffer = fakeBuffer(); let cancelled = 0, prepared = [];
+  buffer.cancel = () => cancelled++; buffer.prepare = async track => { prepared.push(track.name); };
+  const player = new AudioPlayer(audio, { buffer }); player.start(tracks, 'a'); await tick();
+  audio.currentTime = 5; player.prepareNext();
+  player.moveUpcoming(2, 0);
+  assert.deepEqual(player.queue.upcoming.map(t => t.name), ['d', 'b', 'c']);
+  assert.equal(prepared.at(-1), 'd');
+  player.removeUpcoming(0);
+  assert.deepEqual(player.queue.upcoming.map(t => t.name), ['b', 'c']);
+  assert.equal(prepared.at(-1), 'b'); assert.equal(player.track.name, 'a');
+  assert(cancelled >= 3); audio.dispatchEvent(new Event('ended')); assert.equal(player.track.name, 'b');
+  player.setShuffle(true); assert(!player.queue.items.some(t => t.name === 'd'));
+});

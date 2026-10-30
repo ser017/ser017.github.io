@@ -34,6 +34,21 @@ export class TrackQueue {
     this.position++;
     return this.current;
   }
+  get upcoming() { return this.order.slice(this.position + 1).map(index => this.items[index]); }
+  removeUpcoming(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= this.upcoming.length) return false;
+    const [removed] = this.order.splice(this.position + 1 + index, 1);
+    this.items.splice(removed, 1);
+    this.order = this.order.map(value => value > removed ? value - 1 : value);
+    return true;
+  }
+  moveUpcoming(from, to) {
+    const count = this.upcoming.length;
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= count || to >= count || from === to) return false;
+    const [item] = this.order.splice(this.position + 1 + from, 1);
+    this.order.splice(this.position + 1 + to, 0, item);
+    return true;
+  }
   previous() {
     if (!this.current) return null;
     this.position = Math.max(0, this.position - 1);
