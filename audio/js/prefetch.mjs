@@ -1,3 +1,5 @@
+import { recordAudioEvent, errorDetails } from './diagnostics.mjs';
+
 export function directURL(value) {
   const url = new URL(value);
   if (['www.dropbox.com', 'dropbox.com'].includes(url.hostname) && /^\/(scl\/fi|s)\//.test(url.pathname)) {
@@ -6,9 +8,17 @@ export function directURL(value) {
   }
   return url.href;
 }
+function delay(ms, signal) {
+  return new Promise(resolve => {
+    const done = () => { clearTimeout(timer); signal.removeEventListener('abort', done); resolve(); };
+    const timer = setTimeout(done, ms);
+    signal.addEventListener('abort', done, { once: true });
+    if (signal.aborted) done();
+  });
+}
 export class NextTrackBuffer {
-  constructor({ fetcher = globalThis.fetch, makeURL = blob => URL.createObjectURL(blob), revokeURL = url => URL.revokeObjectURL(url), maxBytes = 32 * 1024 * 1024 } = {}) {
-    Object.assign(this, { fetcher, makeURL, revokeURL, maxBytes });
+  constructor({ fetcher = (...args) => globalThis.fetch(...args), makeURL = blob => URL.createObjectURL(blob), revokeURL = url => URL.revokeObjectURL(url), maxBytes = 32 * 1024 * 1024, retryDelays = [1500, 5000], timeoutMs = 45000, report = recordAudioEvent } = {}) {
+    Object.assign(this, { fetcher, makeURL, revokeURL, maxBytes, retryDelays, timeoutMs, report });
     this.job = null; this.ready = null;
   }
   cancel() {
@@ -22,34 +32,56 @@ export class NextTrackBuffer {
     return ready.url;
   }
   async prepare(track) {
-    if (!track?.url) { this.cancel(); return; }
-    if (this.ready?.id === track.name || this.job?.id === track.name) return;
+    if (!track?.url) { this.cancel(); return false; }
+    if (this.ready?.id === track.name) return true;
+    if (this.job?.id === track.name) return false;
     this.cancel();
-    const controller = new AbortController();
-    const job = { id: track.name, controller }; this.job = job;
-    const timer = setTimeout(() => controller.abort(), 45000);
+    const job = { id: track.name, controller: new AbortController() }; this.job = job;
+    const sources = [...new Set([directURL(track.url), track.url])];
     try {
-      const response = await this.fetcher(directURL(track.url), { signal: controller.signal, credentials: 'omit' });
-      if (!response.ok || !response.body) throw new Error('Prefetch unavailable');
-      const type = response.headers.get('content-type') || 'audio/mpeg';
-      if (/text\/|application\/(json|xml)/i.test(type)) throw new Error('Not audio');
-      if (Number(response.headers.get('content-length')) > this.maxBytes) throw new Error('Audio is too large to prefetch');
-      const reader = response.body.getReader(); const chunks = []; let size = 0;
-      try {
-        while (true) {
-          const { done, value } = await reader.read(); if (done) break;
-          size += value.byteLength;
-          if (size > this.maxBytes) { await reader.cancel(); throw new Error('Prefetch limit'); }
-          chunks.push(value);
+      for (let attempt = 0; attempt <= this.retryDelays.length; attempt++) {
+        if (attempt) await delay(this.retryDelays[attempt - 1], job.controller.signal);
+        if (this.job !== job || job.controller.signal.aborted) return false;
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        job.controller.signal.addEventListener('abort', abort, { once: true });
+        let timedOut = false;
+        const timer = setTimeout(() => { timedOut = true; controller.abort(); }, this.timeoutMs);
+        let size = 0, status = null, type = '', permanent = false;
+        const started = Date.now();
+        this.report('prefetch-start', { track: track.name, attempt: attempt + 1, source: attempt % sources.length ? 'original' : 'direct' });
+        try {
+          const response = await this.fetcher(sources[attempt % sources.length], { signal: controller.signal, credentials: 'omit' });
+          status = response.status;
+          if (!response.ok || !response.body) throw new Error(`Prefetch HTTP ${status}`);
+          type = response.headers.get('content-type') || 'audio/mpeg';
+          if (/text\/|application\/(json|xml)/i.test(type)) throw new Error('Response is not audio');
+          if (Number(response.headers.get('content-length')) > this.maxBytes) { permanent = true; throw new Error('Audio exceeds prefetch memory limit'); }
+          const reader = response.body.getReader(); const chunks = [];
+          try {
+            while (true) {
+              const { done, value } = await reader.read(); if (done) break;
+              size += value.byteLength;
+              if (size > this.maxBytes) { permanent = true; await reader.cancel(); throw new Error('Audio exceeds prefetch memory limit'); }
+              chunks.push(value);
+            }
+          } finally { reader.releaseLock(); }
+          if (this.job !== job || controller.signal.aborted) return false;
+          if (!size) throw new Error('Empty audio response');
+          this.ready = { id: track.name, url: this.makeURL(new Blob(chunks, { type })) };
+          this.report('prefetch-ready', { track: track.name, attempt: attempt + 1, bytes: size, elapsedMs: Date.now() - started });
+          return true;
+        } catch (error) {
+          controller.abort();
+          if (this.job !== job || job.controller.signal.aborted) return false;
+          this.report('prefetch-failed', { track: track.name, attempt: attempt + 1, status, type, bytes: size, timedOut, ...errorDetails(error) });
+          if (permanent) break;
+        } finally {
+          clearTimeout(timer); job.controller.signal.removeEventListener('abort', abort);
         }
-      } finally { reader.releaseLock(); }
-      if (this.job !== job || controller.signal.aborted || size === 0) return;
-      this.ready = { id: track.name, url: this.makeURL(new Blob(chunks, { type })) };
-    } catch {
-      controller.abort();
-      // Предзагрузка необязательна: сам трек всегда можно запустить обычным способом.
+      }
+      return false;
     } finally {
-      clearTimeout(timer);
       if (this.job === job) this.job = null;
     }
   }

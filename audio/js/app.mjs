@@ -1,3 +1,4 @@
+import { recordAudioEvent, audioReport } from './diagnostics.mjs';
 import { Catalog, playlistButton } from './catalog.mjs';
 import { AudioPlayer } from './player.mjs';
 
@@ -11,6 +12,19 @@ let metadataId = null;
 const seekDragging = new Set();
 const storageKey = 'ser017-audio-volume';
 let lastVolume = 1;
+let showReport = new URL(location.href).searchParams.has('audio-debug');
+const reportButton = document.createElement('button');
+reportButton.type = 'button'; reportButton.id = 'playback-report'; reportButton.className = 'catalog-retry';
+reportButton.textContent = 'Скачать отчёт'; reportButton.hidden = true;
+document.querySelector('.playback-feedback').append(reportButton);
+reportButton.onclick = () => {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(audioReport(), null, 2)], { type: 'application/json' }));
+  const link = document.createElement('a'); link.href = url; link.download = 'audio-report.json';
+  document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
+};
+recordAudioEvent('page-start');
+for (const event of ['visibilitychange', 'freeze', 'resume']) document.addEventListener(event, () => recordAudioEvent(event));
+for (const event of ['online', 'offline', 'pageshow', 'pagehide']) window.addEventListener(event, () => recordAudioEvent(event));
 
 function time(value) {
   if (!Number.isFinite(value) || value < 0) return '0:00';
@@ -181,7 +195,10 @@ function renderPlayer() {
   }
   for (const id of ['next', 'bottom-next']) $(id).disabled = !player.queue.nextTrack;
   for (const id of ['prev', 'bottom-prev']) $(id).disabled = !track;
-  if (player.status === 'error') setStatus(player.error, () => player.retry());
+  showReport ||= ['error', 'blocked', 'recovering'].includes(player.status);
+  reportButton.hidden = !showReport;
+  if (player.status === 'recovering') setStatus(`Повторная загрузка трека… (${player.retryCount}/${player.retryDelays.length})`);
+  else if (player.status === 'error') setStatus(player.error, () => player.retry());
   else if (player.status === 'blocked') setStatus(player.error);
   else if (player.status === 'loading') setStatus('Загрузка трека…');
   else if (player.status === 'ended') setStatus('Плейлист закончился.');

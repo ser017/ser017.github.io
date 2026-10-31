@@ -15,8 +15,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #3b82f6; outline-
 .mobile-volume-popup input { min-width: 0; flex: 1; accent-color: #2196f3; }
 .playback-info { display: flex; align-items: center; gap: 20px; min-height: 34px; margin: 6px 4px 8px; }
 #now-playing { flex: 1; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.playback-feedback { display: flex; gap: 10px; align-items: center; flex: 0 1 auto; max-width: 50%; min-width: 0; }
-.playback-feedback:has(#playback-status:empty):has(#playback-retry[hidden]) { visibility: hidden; }
+.playback-feedback { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; flex: 0 1 auto; max-width: 50%; min-width: 0; }
+.playback-feedback:has(#playback-status:empty):has(#playback-retry[hidden]):has(#playback-report[hidden]) { visibility: hidden; }
 #playback-status { color: #e5e5e5; font-size: 14px; margin: 0; }
 #playback-retry, .catalog-retry { border: 0; border-radius: 8px; padding: 8px 12px; background: #333; color: #fff; cursor: pointer; }
 #playback-retry[hidden] { display: none; }
@@ -59,3 +59,5 @@ button:focus-visible, input:focus-visible { outline: 2px solid #3b82f6; outline-
 
 .queue-row .queue-handle { background: transparent; color: #777; cursor: grab; touch-action: none; }
 .queue-row.queue-dragging { opacity: .55; }
+
+#playback-report[hidden] { display: none; }
