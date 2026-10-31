@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { TrackQueue } from '../js/queue.mjs';
 import { AudioPlayer } from '../js/player.mjs';
 import { NextTrackBuffer, directURL } from '../js/prefetch.mjs';
+import { ContinuousAudio } from '../js/continuous.mjs';
 
 const tracks = ['a', 'b', 'c', 'd'].map(name => ({ name, title: name, artist: 'Test', url: `https://example.invalid/${name}.mp3` }));
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -438,4 +439,142 @@ test('stable playback replenishes the interruption budget while manual pause alw
   assert.equal(player.pauseRecoveryCount, 1); audio.currentTime = 31; audio.dispatchEvent(new Event('timeupdate'));
   assert.equal(player.pauseRecoveryCount, 0); audio.pause(); player.pause(); const calls = audio.playCalls;
   t.mock.timers.tick(100); await tick(); assert.equal(audio.playCalls, calls); assert.equal(player.status, 'paused');
+});
+
+class FakeSourceBuffer extends EventTarget {
+  constructor() {
+    super(); this.start = 0; this.end = 0; this.timestampOffset = 0; this.removals = []; this.quota = 0;
+    const self = this;
+    this.buffered = { get length() { return self.end > self.start ? 1 : 0; }, start: () => self.start, end: () => self.end };
+  }
+  appendBuffer(bytes) {
+    if (this.quota) { this.quota--; throw new DOMException('Full', 'QuotaExceededError'); }
+    this.end = Math.max(this.end, this.timestampOffset) + bytes.byteLength;
+    queueMicrotask(() => this.dispatchEvent(new Event('updateend')));
+  }
+  remove(start, end) {
+    this.removals.push([start,end]);
+    if (start === 0 && end < this.end) this.start = end;
+    else if (start > 0) this.end = Math.min(this.end,start);
+    else this.start = this.end = 0;
+    queueMicrotask(() => this.dispatchEvent(new Event('updateend')));
+  }
+  abort() {}
+}
+class FakeMediaSource extends EventTarget {
+  constructor() { super(); this.sb = new FakeSourceBuffer(); this.readyState = 'closed'; this.ends = 0; }
+  open() { this.readyState = 'open'; this.dispatchEvent(new Event('sourceopen')); }
+  addSourceBuffer(type) { assert.equal(type,'audio/mpeg'); return this.sb; }
+  endOfStream() { this.ends++; this.readyState = 'ended'; }
+}
+function continuousHarness(options = {}) {
+  const audio = new FakeAudio(), source = new FakeMediaSource(), revoked = [], all = new Map(tracks.map(t => [t.name,new Blob([new Uint8Array(4)],{type:'audio/mpeg'})]));
+  audio.loads = 0; const load = audio.load.bind(audio); audio.load = () => { audio.loads++; load(); };
+  const buffer = fakeBuffer();
+  buffer.prepareQueue = () => {}; buffer.peekBlob = id => all.get(id); buffer.take = id => all.has(id) ? `blob:file-${id}` : null; buffer.suspend = () => {};
+  const stream = new ContinuousAudio(audio,{enabled:true,createSource:()=>source,makeURL:()=> 'blob:one-stream',revokeURL:u=>revoked.push(u),durationOf:async b=>b.size,chunkBytes:10,...options});
+  const player = new AudioPlayer(audio,{buffer,continuous:stream,revokeURL:u=>revoked.push(u)});
+  const start = async () => { player.start(tracks,'a'); source.open(); await settle(); };
+  return {audio,source,stream,player,start,revoked,all};
+}
+
+test('continuous playback crosses song boundaries without changing src, load, or play', async () => {
+  const h = continuousHarness(); await h.start();
+  const calls = h.audio.playCalls;
+  for (const [time,name] of [[4.1,'b'],[8.1,'c'],[12.1,'d']]) {
+    h.audio.currentTime = time; h.audio.dispatchEvent(new Event('timeupdate')); await settle();
+    assert.equal(h.player.track.name,name); assert.equal(h.audio.src,'blob:one-stream');
+    assert.equal(h.audio.loads,1); assert.equal(h.audio.playCalls,calls); assert(h.player.position < .2);
+    assert.equal(h.player.duration,4);
+  }
+  h.player.pause(); h.stream.stop();
+});
+
+test('queue edits remove already appended future audio and append the revised order', async () => {
+  const h=continuousHarness(); await h.start(); h.player.moveUpcoming(2,0); await settle();
+  assert.deepEqual(h.stream.segments.map(x=>x.track.name),['a','d','b','c']);
+  assert(h.source.sb.removals.some(([start,end])=>start===4 && end===Infinity));
+  h.audio.currentTime=4.1; h.audio.dispatchEvent(new Event('timeupdate')); await settle();
+  assert.equal(h.player.track.name,'d'); assert.equal(h.audio.loads,1); h.player.pause();h.stream.stop();
+});
+
+test('editing or deleting the next song while paused updates the stream without resuming it', async () => {
+  const h=continuousHarness();await h.start();h.player.pause();const calls=h.audio.playCalls;
+  h.player.removeUpcoming(0);await settle();
+  assert.equal(h.audio.paused,true);assert.equal(h.audio.playCalls,calls);
+  assert.deepEqual(h.stream.segments.map(x=>x.track.name),['a']);
+  h.player.play();await settle();assert.deepEqual(h.stream.segments.map(x=>x.track.name),['a','c','d']);
+  h.player.pause();h.stream.stop();
+});
+
+test('repeat appends the current file and leaving repeat restores the actual queue', async () => {
+  const h=continuousHarness({aheadSeconds:5});await h.start();h.player.setRepeat(true);await settle();
+  assert(h.stream.segments.slice(1).every(x=>x.track.name==='a'));
+  h.audio.currentTime=4.1;h.audio.dispatchEvent(new Event('timeupdate'));await settle();
+  assert.equal(h.player.track.name,'a');assert.equal(h.player.queue.nextTrack.name,'b');assert.equal(h.audio.loads,1);
+  h.player.setRepeat(false);await settle();
+  assert.deepEqual(h.stream.segments.map(x=>x.track.name),['a','b']);h.player.pause();h.stream.stop();
+});
+
+test('missing next-file data waits without endOfStream and continues after the file arrives', async () => {
+  const h=continuousHarness();const b=h.all.get('b');h.all.delete('b');await h.start();
+  assert.equal(h.source.ends,0);assert.deepEqual(h.stream.segments.map(x=>x.track.name),['a']);
+  h.all.set('b',b);h.player.buffer.onChange();await settle();
+  assert.equal(h.stream.segments.length,4);assert(h.source.ends>0);h.player.pause();h.stream.stop();
+});
+
+test('manual pause and later resume keep the same MediaSource and track position', async () => {
+  const h=continuousHarness();await h.start();h.audio.currentTime=2;h.player.pause();await settle();
+  assert.equal(h.audio.paused,true);assert.equal(h.player.wantPlay,false);
+  h.player.play();await settle();assert.equal(h.player.position,2);assert.equal(h.audio.loads,1);assert(h.stream.active);
+  h.player.pause();h.stream.stop();
+});
+
+test('seeking within buffered audio keeps the stream, while an evicted position restores the current file on pause', async () => {
+  const h=continuousHarness();await h.start();h.audio.currentTime=5;h.audio.dispatchEvent(new Event('timeupdate'));await settle();
+  h.player.seek(2);assert.equal(h.audio.currentTime,6);assert(h.stream.active);
+  h.player.pause();h.source.sb.start=5;h.player.seek(0);await settle();
+  assert.equal(h.stream.active,false);assert.equal(h.audio.src,'blob:file-b');assert.equal(h.player.wantPlay,false);assert.equal(h.audio.paused,true);
+});
+
+test('stream failure restores the same song and its relative position, then disables failed stream mode', async () => {
+  const h=continuousHarness();await h.start();h.audio.currentTime=6;h.audio.dispatchEvent(new Event('timeupdate'));await settle();
+  h.stream.fail(new Error('decoder'));h.audio.dispatchEvent(new Event('loadedmetadata'));await settle();
+  assert.equal(h.player.track.name,'b');assert.equal(h.audio.src,'blob:file-b');assert.equal(h.audio.currentTime,2);assert.equal(h.stream.enabled,false);h.player.pause();
+});
+
+test('in-flight metadata from a replaced stream cannot change a later selection', async () => {
+  let resolve;const h=continuousHarness({durationOf:()=>new Promise(r=>{resolve=r;})});
+  h.player.start(tracks,'a');h.source.open();await tick();h.player.pause();h.stream.stop();
+  resolve(4);await settle();assert.equal(h.stream.active,false);assert.equal(h.source.sb.end,0);assert.equal(h.player.wantPlay,false);
+});
+
+test('continuous buffering is bounded ahead and prunes played bytes', async () => {
+  const h=continuousHarness({aheadSeconds:2,behindSeconds:1,chunkBytes:1});await h.start();
+  assert(h.source.sb.end<=2);h.audio.currentTime=2;h.audio.dispatchEvent(new Event('timeupdate'));await settle();
+  h.audio.currentTime=3;h.audio.dispatchEvent(new Event('timeupdate'));await settle();
+  assert(h.source.sb.start>=2);assert(h.stream.state.bufferedAhead<=2);h.player.pause();h.stream.stop();
+});
+
+test('an unsupported or malformed MP3 metadata result falls back instead of leaving a silent stream', async () => {
+  const h=continuousHarness({durationOf:async()=>{throw new Error('Bad MP3');}});await h.start();
+  assert.equal(h.stream.active,false);assert.equal(h.stream.enabled,false);assert.equal(h.audio.src,'blob:file-a');assert.equal(h.player.track.name,'a');h.player.pause();
+});
+
+test('persistent source-buffer quota exhaustion falls back without an append retry loop', async () => {
+  const h=continuousHarness();h.source.sb.quota=100;await h.start();
+  assert.equal(h.stream.active,false);assert.equal(h.stream.enabled,false);assert.equal(h.source.sb.quota,98);assert.equal(h.audio.src,'blob:file-a');h.player.pause();
+});
+
+test('restarting after the end of a stream opens the final song from its beginning', async () => {
+  const h=continuousHarness();await h.start();h.audio.currentTime=12.1;h.audio.dispatchEvent(new Event('timeupdate'));await settle();
+  h.audio.currentTime=16;h.audio.paused=true;h.audio.ended=true;h.audio.dispatchEvent(new Event('ended'));
+  assert.equal(h.player.status,'ended');h.player.play();await settle();
+  assert.equal(h.stream.active,false);assert.equal(h.audio.src,'blob:file-d');assert.equal(h.audio.currentTime,0);assert.equal(h.player.wantPlay,true);h.player.pause();
+});
+
+test('a queue edit racing a stream boundary follows the revised queue instead of restarting the old song', async () => {
+  const h=continuousHarness();await h.start();h.player.queue.removeUpcoming(0);
+  h.audio.currentTime=4.1;h.audio.dispatchEvent(new Event('timeupdate'));await settle();
+  assert.equal(h.player.track.name,'c');assert.equal(h.player.queue.current.name,'c');h.player.pause();h.stream.stop();
 });

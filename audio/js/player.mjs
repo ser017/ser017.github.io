@@ -2,9 +2,10 @@ import { recordAudioEvent, errorDetails } from './diagnostics.mjs';
 import { TrackQueue } from './queue.mjs';
 import { PlaybackBuffer } from './reserve.mjs';
 import { directURL } from './prefetch.mjs';
+import { ContinuousAudio } from './continuous.mjs';
 
 export class AudioPlayer extends EventTarget {
-  constructor(audio, { queue = new TrackQueue(), buffer = new PlaybackBuffer(), revokeURL = url => URL.revokeObjectURL(url), retryDelays = [1000, 3000, 7000, 15000, 30000, 60000, 60000, 60000], startupTimeoutMs = 25000, stalledTimeoutMs = 20000, pauseRecoveryDelays = [300, 1500], isHidden = () => globalThis.document?.hidden === true, report = recordAudioEvent } = {}) {
+  constructor(audio, { queue = new TrackQueue(), buffer = new PlaybackBuffer(), continuous = null, revokeURL = url => URL.revokeObjectURL(url), retryDelays = [1000, 3000, 7000, 15000, 30000, 60000, 60000, 60000], startupTimeoutMs = 25000, stalledTimeoutMs = 20000, pauseRecoveryDelays = [300, 1500], isHidden = () => globalThis.document?.hidden === true, report = recordAudioEvent } = {}) {
     super();
     Object.assign(this, { audio, queue, buffer, revokeURL, retryDelays, startupTimeoutMs, stalledTimeoutMs, pauseRecoveryDelays, isHidden, report });
     this.track = null; this.status = 'idle'; this.wantPlay = false; this.repeat = false;
@@ -12,8 +13,13 @@ export class AudioPlayer extends EventTarget {
     this.error = ''; this.prefetchFor = null;
     this.retryTimer = null; this.retryCount = 0; this.resumeAt = 0; this.watchdog = null;
     this.pauseRecoveryTimer = null; this.pauseRecoveryCount = 0; this.pauseRecoveryProgress = 0;
+    this.stream = continuous || new ContinuousAudio(audio, { report });
+    this.stream.getBlob = track => this.buffer.peekBlob?.(track.name);
+    this.stream.onAdvance = segment => this.advanceStream(segment);
+    this.stream.onError = error => this.sourceFailed(error);
     this.buffer.onChange = () => {
       this.dispatchEvent(new Event('buffer'));
+      this.stream.pump();
       if (this.track && this.wantPlay && ['loading', 'recovering'].includes(this.status)) {
         const prepared = this.buffer.take(this.track.name);
         if (prepared) this.usePrepared(prepared);
@@ -30,8 +36,8 @@ export class AudioPlayer extends EventTarget {
     });
     audio.addEventListener('stalled', () => { if (this.wantPlay) { this.log('audio-stalled'); this.armWatchdog(this.stalledTimeoutMs); } });
     audio.addEventListener('timeupdate', () => {
-      if (this.wantPlay && !audio.paused && audio.readyState >= 3 && audio.currentTime !== this.lastProgress) { this.lastProgress = audio.currentTime; this.clearWatchdog(); }
-      if (!audio.paused && this.pauseRecoveryCount && audio.currentTime - this.pauseRecoveryProgress >= 30) this.pauseRecoveryCount = 0;
+      if (this.wantPlay && !audio.paused && audio.readyState >= 3 && this.position !== this.lastProgress) { this.lastProgress = this.position; this.clearWatchdog(); }
+      if (!audio.paused && this.pauseRecoveryCount && this.position - this.pauseRecoveryProgress >= 30) this.pauseRecoveryCount = 0;
       this.dispatchEvent(new Event('progress'));
       if (this.wantPlay && !audio.paused && audio.readyState >= 3) this.prepareNext();
     });
@@ -43,7 +49,7 @@ export class AudioPlayer extends EventTarget {
     audio.addEventListener('volumechange', () => this.dispatchEvent(new Event('volume')));
     audio.addEventListener('error', () => { if (audio.error) this.sourceFailed(audio.error); });
     audio.addEventListener('ended', () => {
-      if (this.repeat || !this.wantPlay) return;
+      if ((this.repeat && !this.stream.active) || !this.wantPlay) return;
       this.clearRetry(); this.clearWatchdog(); this.clearPauseRecovery(); this.log('ended');
       const next = this.queue.next();
       // Один и тот же audio-элемент и немедленный play(), независимо от visibilityState.
@@ -53,11 +59,11 @@ export class AudioPlayer extends EventTarget {
   }
   log(event, details = {}) {
     this.report(event, { track: this.track?.name || null, status: this.status, wantPlay: this.wantPlay,
-      source: this.audio.src?.startsWith('blob:') ? 'buffered' : this.audio.src === directURL(this.track?.url || 'https://invalid.local') ? 'direct' : 'original',
-      sourceIndex: this.sourceIndex, retry: this.retryCount, currentTime: this.audio.currentTime || 0,
+      source: this.stream.active ? 'continuous' : this.audio.src?.startsWith('blob:') ? 'buffered' : this.audio.src === directURL(this.track?.url || 'https://invalid.local') ? 'direct' : 'original',
+      sourceIndex: this.sourceIndex, retry: this.retryCount, currentTime: this.position || 0, timelineTime: this.audio.currentTime || 0,
       readyState: this.audio.readyState, networkState: this.audio.networkState, paused: this.audio.paused, ended: this.audio.ended,
-      duration: Number.isFinite(this.audio.duration) ? this.audio.duration : null, pauseRecovery: this.pauseRecoveryCount,
-      reserve: this.bufferState, ...details });
+      duration: Number.isFinite(this.duration) ? this.duration : null, pauseRecovery: this.pauseRecoveryCount,
+      reserve: this.bufferState, stream: this.stream.state, ...details });
   }
   clearPauseRecovery() { if (this.pauseRecoveryTimer !== null) clearTimeout(this.pauseRecoveryTimer); this.pauseRecoveryTimer = null; }
   handlePause(event) {
@@ -75,7 +81,7 @@ export class AudioPlayer extends EventTarget {
         this.pauseRecoveryTimer = setTimeout(() => {
           this.pauseRecoveryTimer = null;
           if (token !== this.request || !this.wantPlay || !this.audio.paused || this.status !== 'interrupted') return;
-          this.pauseRecoveryCount++; this.pauseRecoveryProgress = this.audio.currentTime;
+          this.pauseRecoveryCount++; this.pauseRecoveryProgress = this.position;
           this.log('pause-recovery-start'); this.play();
         }, delay);
         this.pauseRecoveryTimer?.unref?.();
@@ -109,6 +115,28 @@ export class AudioPlayer extends EventTarget {
     }
   }
   get bufferState() { return this.buffer.state || { ready: 0, total: 0 }; }
+  get position() { return this.stream.active ? this.stream.position : this.audio.currentTime; }
+  get duration() { return this.stream.active ? this.stream.duration : this.audio.duration; }
+  advanceStream(segment) {
+    if (!segment.repeated) {
+      if (this.queue.nextTrack?.name !== segment.track.name) {
+        this.log('stream-queue-race');
+        const desired = this.queue.next();
+        if (desired) this.select(desired, this.wantPlay);
+        else { this.wantPlay = false; this.stream.stop(); this.audio.pause(); this.status = 'ended'; this.notify(); }
+        return;
+      }
+      this.queue.next();
+      const previousBlob = this.activeBlob;
+      this.activeBlob = this.buffer.take(segment.track.name) || URL.createObjectURL(segment.blob);
+      if (previousBlob && previousBlob !== this.activeBlob) this.revokeURL(previousBlob);
+      this.track = segment.track;
+    }
+    this.request++; this.clearRetry(); this.clearWatchdog(); this.clearPauseRecovery();
+    this.retryCount = 0; this.pauseRecoveryCount = 0; this.pauseRecoveryProgress = 0; this.lastProgress = null;
+    this.status = this.wantPlay ? 'playing' : 'paused'; this.error = ''; this.log('continuous-next', { repeated: segment.repeated });
+    this.notify(); this.prepareNext();
+  }
   notify() { this.dispatchEvent(new Event('state')); }
   start(tracks, id, { shuffle = this.queue.shuffle } = {}) {
     const playable = tracks.filter(track => track.url);
@@ -121,7 +149,9 @@ export class AudioPlayer extends EventTarget {
     if (!track?.url) return;
     this.clearRetry(); this.clearWatchdog(); this.clearPauseRecovery(); this.pauseRecoveryCount = 0; this.pauseRecoveryProgress = 0;
     this.retryCount = 0; this.resumeAt = 0; this.lastProgress = null;
+    const blob = this.buffer.peekBlob?.(track.name);
     const prepared = this.buffer.take(track.name);
+    this.stream.stop();
     if (!this.buffer.prepareQueue) this.buffer.cancel(); this.prefetchFor = null;
     const previousBlob = this.activeBlob;
     this.activeBlob = prepared;
@@ -129,7 +159,10 @@ export class AudioPlayer extends EventTarget {
     this.request++;
     this.candidates = [...new Set([prepared, directURL(track.url), track.url].filter(Boolean))];
     this.sourceIndex = 0;
-    this.audio.src = this.candidates[0]; this.audio.loop = this.repeat; this.audio.load();
+    let streaming = false;
+    try { streaming = Boolean(blob && this.stream.start(track, blob, this.queue.upcoming, this.repeat)); }
+    catch (error) { this.stream.stop(); this.stream.enabled = false; this.log('stream-start-failed', errorDetails(error)); }
+    if (!streaming) { this.audio.src = this.candidates[0]; this.audio.loop = this.repeat; this.audio.load(); }
     if (previousBlob && previousBlob !== prepared) this.revokeURL(previousBlob);
     this.log('select', { buffered: Boolean(prepared) }); this.notify();
     if (autoplay) this.play();
@@ -164,6 +197,7 @@ export class AudioPlayer extends EventTarget {
   }
   play() {
     if (!this.track) return;
+    if (this.stream.active && this.status === 'ended') { this.wantPlay = true; this.leaveStream(0); return; }
     if (this.status === 'error' || this.audio.error) { this.retry(); return; }
     this.clearRetry(); this.clearPauseRecovery();
     this.wantPlay = true; this.error = ''; this.status = 'loading'; this.armWatchdog(this.startupTimeoutMs); this.notify();
@@ -191,12 +225,16 @@ export class AudioPlayer extends EventTarget {
   next() { const track = this.queue.next(); if (track) this.select(track, true); }
   previous() {
     if (!this.track) return;
-    if (this.audio.currentTime > 3) { this.seek(0); return; }
+    if (this.position > 3) { this.seek(0); return; }
     const track = this.queue.previous(); if (track) this.select(track, true);
   }
   seek(value) {
-    if (!Number.isFinite(this.audio.duration) || this.audio.duration <= 0) return;
-    this.audio.currentTime = Math.max(0, Math.min(value, this.audio.duration));
+    if (!Number.isFinite(this.duration) || this.duration <= 0) return;
+    const position = Math.max(0, Math.min(value, this.duration));
+    if (this.stream.active) {
+      if (this.stream.canSeek(position)) this.stream.seek(position);
+      else this.leaveStream(position);
+    } else this.audio.currentTime = position;
     this.dispatchEvent(new Event('progress'));
   }
   setShuffle(value) {
@@ -205,7 +243,7 @@ export class AudioPlayer extends EventTarget {
     this.notify();
   }
   setRepeat(value) {
-    this.repeat = Boolean(value); this.audio.loop = this.repeat;
+    this.repeat = Boolean(value); this.audio.loop = this.stream.active ? false : this.repeat;
     if (!this.buffer.prepareQueue) this.buffer.cancel(); this.prefetchFor = null;
     if (this.buffer.prepareQueue || (!this.repeat && this.wantPlay && !this.audio.paused)) this.prepareNext();
     this.notify();
@@ -219,6 +257,7 @@ export class AudioPlayer extends EventTarget {
   removeUpcoming(index) { this.updateQueue('removeUpcoming', index); }
   moveUpcoming(from, to) { this.updateQueue('moveUpcoming', from, to); }
   prepareNext() {
+    if (this.stream.active) this.stream.setUpcoming(this.queue.upcoming, this.repeat);
     if (this.buffer.prepareQueue) {
       if (this.repeat) { this.buffer.suspend(); return; }
       this.buffer.prepareQueue(this.queue.upcoming);
@@ -233,7 +272,8 @@ export class AudioPlayer extends EventTarget {
   sourceFailed(error) {
     if (!this.track || this.status === 'error' || this.retryTimer !== null) return;
     this.clearWatchdog(); this.log('source-failed', errorDetails(error));
-    this.resumeAt = Math.max(this.resumeAt, this.audio.currentTime || 0);
+    if (this.stream.active) { this.leaveStream(this.position); return; }
+    this.resumeAt = Math.max(this.resumeAt, this.position || 0);
     if (this.sourceIndex + 1 < this.candidates.length) {
       this.loadCandidate(this.sourceIndex + 1);
       return;
@@ -260,5 +300,10 @@ export class AudioPlayer extends EventTarget {
     this.status = this.wantPlay ? 'loading' : 'paused';
     this.audio.src = this.candidates[index]; this.audio.load();
     this.log('load-source'); this.notify(); if (this.wantPlay) this.play();
+  }
+  leaveStream(position) {
+    this.stream.stop(); this.resumeAt = position;
+    this.candidates = [...new Set([this.activeBlob, directURL(this.track.url), this.track.url].filter(Boolean))];
+    this.audio.loop = this.repeat; this.log('stream-fallback'); this.loadCandidate(0);
   }
 }

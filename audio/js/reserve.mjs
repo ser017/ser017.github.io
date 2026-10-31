@@ -38,6 +38,7 @@ export class PlaybackBuffer {
     this.entries.delete(id); this.order = this.order.filter(x => x !== id);
     this.emit(); return url;
   }
+  peekBlob(id) { return this.entries.get(id)?.buffer.ready?.blob || null; }
   async restore(track) {
     const blob = await this.cache.get(track);
     return blob ? this.makeURL(blob) : null;

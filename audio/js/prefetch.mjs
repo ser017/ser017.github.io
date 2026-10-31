@@ -43,7 +43,7 @@ export class NextTrackBuffer {
       const cached = await this.cache?.get(track);
       if (this.job !== job || job.controller.signal.aborted) return false;
       if (cached) {
-        this.ready = { id: track.name, url: this.makeURL(cached), bytes: cached.size };
+        this.ready = { id: track.name, url: this.makeURL(cached), bytes: cached.size, blob: cached };
         this.report('prefetch-ready', { track: track.name, bytes: cached.size, cached: true }); return true;
       }
       for (let attempt = 0; attempt <= this.retryDelays.length; attempt++) {
@@ -91,7 +91,7 @@ export class NextTrackBuffer {
           }
           if (this.job !== job || controller.signal.aborted) return false;
           if (!blob?.size) throw new Error('Empty audio response');
-          this.ready = { id: track.name, url: this.makeURL(blob), bytes: size };
+          this.ready = { id: track.name, url: this.makeURL(blob), bytes: size, blob };
           this.report('prefetch-ready', { track: track.name, attempt: attempt + 1, bytes: size, elapsedMs: Date.now() - started });
           return true;
         } catch (error) {

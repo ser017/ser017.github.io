@@ -212,8 +212,8 @@ function renderFeedback() {
   else setStatus('');
 }
 function updateProgress() {
-  const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
-  const position = Math.max(0, Math.min(audio.currentTime || 0, duration));
+  const duration = Number.isFinite(player.duration) && player.duration > 0 ? player.duration : 0;
+  const position = Math.max(0, Math.min(player.position || 0, duration));
   for (const id of ['seekbar', 'bp-seek']) {
     const slider = $(id); slider.disabled = !duration; slider.max = duration || 1;
     if (!seekDragging.has(id)) slider.value = position;
@@ -303,8 +303,8 @@ if ('mediaSession' in navigator) {
     play: () => { if (player.status === 'error') player.retry(); else if (player.track) player.play(); else togglePlayback(); },
     pause: () => player.pause('media-session'), stop: () => player.pause('media-session-stop'),
     previoustrack: () => player.previous(), nexttrack: () => player.next(),
-    seekbackward: event => player.seek(audio.currentTime - (event.seekOffset || 10)),
-    seekforward: event => player.seek(audio.currentTime + (event.seekOffset || 10)),
+    seekbackward: event => player.seek(player.position - (event.seekOffset || 10)),
+    seekforward: event => player.seek(player.position + (event.seekOffset || 10)),
     seekto: event => { if (Number.isFinite(event.seekTime)) player.seek(event.seekTime); },
   };
   for (const [action, handler] of Object.entries(actions)) {
