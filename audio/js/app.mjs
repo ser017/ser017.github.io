@@ -1,4 +1,4 @@
-import { recordAudioEvent, audioReport } from './diagnostics.mjs';
+import { audioReport } from './diagnostics.mjs';
 import { Catalog, playlistButton } from './catalog.mjs';
 import { AudioPlayer } from './player.mjs';
 
@@ -22,9 +22,9 @@ reportButton.onclick = () => {
   const link = document.createElement('a'); link.href = url; link.download = 'audio-report.json';
   document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
 };
-recordAudioEvent('page-start');
-for (const event of ['visibilitychange', 'freeze', 'resume']) document.addEventListener(event, () => recordAudioEvent(event));
-for (const event of ['online', 'offline', 'pageshow', 'pagehide']) window.addEventListener(event, () => recordAudioEvent(event));
+player.log('page-start');
+for (const event of ['visibilitychange', 'freeze', 'resume']) document.addEventListener(event, () => player.log(event));
+for (const event of ['online', 'offline', 'pageshow', 'pagehide']) window.addEventListener(event, () => player.log(event));
 
 function time(value) {
   if (!Number.isFinite(value) || value < 0) return '0:00';
@@ -181,9 +181,10 @@ function renderPlayer() {
   const title = track ? `${track.artist} — ${track.title}` : '';
   $('now-playing').textContent = title ? `Сейчас играет: ${title}` : 'Сейчас ничего не играет';
   $('bp-title').textContent = title || 'Выберите трек'; $('bp-title').title = title;
+  const active = player.wantPlay && !(player.status === 'interrupted' && player.pauseRecoveryTimer === null);
   for (const id of ['play-pause', 'bottom-play-pause']) {
-    $(id).textContent = player.wantPlay ? '⏸️' : '▶️';
-    $(id).setAttribute('aria-label', player.wantPlay ? 'Пауза' : 'Воспроизвести');
+    $(id).textContent = active ? '⏸️' : '▶️';
+    $(id).setAttribute('aria-label', active ? 'Пауза' : 'Воспроизвести');
   }
   for (const id of ['top-shuffle', 'bottom-shuffle']) {
     $(id).classList.toggle('active', player.queue.shuffle);
@@ -199,9 +200,10 @@ function renderPlayer() {
   highlight(); syncMediaSession(); updateProgress(); renderQueue();
 }
 function renderFeedback() {
-  showReport ||= ['error', 'blocked', 'recovering'].includes(player.status) || player.buffer.hadFailure;
+  showReport ||= ['error', 'blocked', 'recovering', 'interrupted'].includes(player.status) || player.buffer.hadFailure;
   reportButton.hidden = !showReport;
   if (player.status === 'recovering') setStatus(`Повторная загрузка трека… (${player.retryCount}/${player.retryDelays.length})`);
+  else if (player.status === 'interrupted') setStatus(player.pauseRecoveryTimer !== null ? 'Воспроизведение прервано. Продолжаю…' : 'Воспроизведение приостановлено. Нажмите ▶, чтобы продолжить.', () => player.play());
   else if (player.status === 'error') setStatus(player.error, () => player.retry());
   else if (player.status === 'blocked') setStatus(player.error);
   else if (player.status === 'loading') setStatus('Загрузка трека…');
@@ -231,7 +233,7 @@ function syncMediaSession() {
       metadataId = track.name;
       navigator.mediaSession.metadata = new MediaMetadata({ title: track.title || '', artist: track.artist || '', album: track.album || '', artwork: track.cover ? [{ src: track.cover }] : [] });
     }
-    navigator.mediaSession.playbackState = !track ? 'none' : player.wantPlay ? 'playing' : 'paused';
+    navigator.mediaSession.playbackState = !track ? 'none' : player.wantPlay && player.status !== 'interrupted' ? 'playing' : 'paused';
   } catch {}
 }
 function volumeChanged() {
@@ -299,12 +301,15 @@ for (const event of ['resume', 'visibilitychange']) document.addEventListener(ev
 if ('mediaSession' in navigator) {
   const actions = {
     play: () => { if (player.status === 'error') player.retry(); else if (player.track) player.play(); else togglePlayback(); },
-    pause: () => player.pause(), previoustrack: () => player.previous(), nexttrack: () => player.next(),
+    pause: () => player.pause('media-session'), stop: () => player.pause('media-session-stop'),
+    previoustrack: () => player.previous(), nexttrack: () => player.next(),
     seekbackward: event => player.seek(audio.currentTime - (event.seekOffset || 10)),
     seekforward: event => player.seek(audio.currentTime + (event.seekOffset || 10)),
     seekto: event => { if (Number.isFinite(event.seekTime)) player.seek(event.seekTime); },
   };
-  for (const [action, handler] of Object.entries(actions)) { try { navigator.mediaSession.setActionHandler(action, handler); } catch {} }
+  for (const [action, handler] of Object.entries(actions)) {
+    try { navigator.mediaSession.setActionHandler(action, event => { player.log('media-action', { action }); handler(event); }); } catch {}
+  }
 }
 function panelSpace() {
   const panel = document.querySelector('.bottom-player');

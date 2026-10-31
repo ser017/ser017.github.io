@@ -353,3 +353,89 @@ test('each playback retry can restore a file that became available in the persis
   assert.equal(audio.src, 'blob:newly-cached'); assert.equal(player.status, 'playing'); assert.equal(player.track.name, 'a');
   player.pause();
 });
+
+for (const position of [.070251, 56.304582]) test(`hidden native pause at ${position}s resumes the same file without changing the queue`, async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const audio = new FakeAudio(), log = [], buffer = fakeBuffer(); let suspended = 0;
+  buffer.suspend = () => suspended++;
+  buffer.take = id => id === 'b' ? 'blob:complete-b' : null;
+  const player = new AudioPlayer(audio, { buffer, isHidden: () => true, pauseRecoveryDelays: [30], report: (event, details) => log.push({ event, ...details }) });
+  player.start(tracks, 'a'); await tick(); audio.dispatchEvent(new Event('ended')); await tick();
+  audio.currentTime = position; const calls = audio.playCalls; audio.pause();
+  assert.equal(player.status, 'interrupted'); assert.equal(player.wantPlay, true); assert(suspended > 0);
+  t.mock.timers.tick(30); await tick();
+  assert.equal(audio.playCalls, calls + 1); assert.equal(player.status, 'playing'); assert.equal(audio.currentTime, position);
+  assert.equal(audio.src, 'blob:complete-b'); assert.equal(player.queue.current.name, 'b'); assert.equal(player.queue.nextTrack.name, 'c');
+  assert(log.some(x => x.event === 'audio-interrupted' && x.paused && x.wantPlay)); player.pause();
+});
+
+test('manual pause including lock-screen pause cancels pending background recovery', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  for (const origin of ['page', 'media-session', 'media-session-stop']) {
+    const audio = new FakeAudio(), player = new AudioPlayer(audio, { buffer: fakeBuffer(), isHidden: () => true, pauseRecoveryDelays: [30] });
+    player.start(tracks, 'a'); await tick(); audio.pause();
+    player.pause(origin); const calls = audio.playCalls;
+    t.mock.timers.tick(1000); player.recover(); await tick();
+    assert.equal(audio.playCalls, calls); assert.equal(player.wantPlay, false); assert.equal(player.status, 'paused');
+  }
+});
+
+test('a delayed pause event from an old source never pauses an already playing new source', async () => {
+  const audio = new FakeAudio(), player = new AudioPlayer(audio, { buffer: fakeBuffer(), isHidden: () => true });
+  player.start(tracks, 'a'); await tick(); player.next(); await tick();
+  const calls = audio.playCalls; audio.dispatchEvent(new Event('pause'));
+  assert.equal(audio.paused, false); assert.equal(player.wantPlay, true); assert.equal(player.status, 'playing');
+  assert.equal(player.pauseRecoveryTimer, null); assert.equal(audio.playCalls, calls); player.pause();
+});
+
+test('persistent external suspension is bounded and visibility can recover it without reloading the song', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] }); let hidden = true;
+  const audio = new FakeAudio(), player = new AudioPlayer(audio, { buffer: fakeBuffer(), isHidden: () => hidden, pauseRecoveryDelays: [10, 20] });
+  player.start(tracks, 'a'); await tick(); audio.currentTime = 56;
+  for (const delay of [10, 20]) { audio.pause(); t.mock.timers.tick(delay); await tick(); }
+  audio.pause(); const calls = audio.playCalls;
+  t.mock.timers.tick(100000); player.recover(); await tick();
+  assert.equal(audio.playCalls, calls); assert.equal(player.status, 'interrupted'); assert.equal(player.wantPlay, true);
+  hidden = false; player.recover(); await tick();
+  assert.equal(player.status, 'playing'); assert.equal(audio.playCalls, calls + 1); assert.equal(audio.currentTime, 56); player.pause();
+});
+
+test('changing track during a pending pause recovery cannot resume the old track', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const audio = new FakeAudio(), player = new AudioPlayer(audio, { buffer: fakeBuffer(), isHidden: () => true, pauseRecoveryDelays: [30] });
+  player.start(tracks, 'a'); await tick(); audio.pause(); player.next(); await tick(); const calls = audio.playCalls;
+  t.mock.timers.tick(100); await tick();
+  assert.equal(player.track.name, 'b'); assert.equal(audio.playCalls, calls); assert.equal(player.pauseRecoveryCount, 0); player.pause();
+});
+
+test('repeated native pause events do not consume recovery attempts or delay the pending attempt', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const audio = new FakeAudio(), player = new AudioPlayer(audio, { buffer: fakeBuffer(), isHidden: () => true, pauseRecoveryDelays: [30] });
+  player.start(tracks, 'a'); await tick(); audio.pause(); t.mock.timers.tick(20); audio.pause();
+  assert.equal(player.pauseRecoveryCount, 0); t.mock.timers.tick(10); await tick();
+  assert.equal(player.pauseRecoveryCount, 1); assert.equal(player.status, 'playing'); player.pause();
+});
+
+test('a foreground native pause remains paused and recovery never resumes it', async () => {
+  const audio = new FakeAudio(), player = new AudioPlayer(audio, { buffer: fakeBuffer(), isHidden: () => false });
+  player.start(tracks, 'a'); await tick(); audio.pause(); const calls = audio.playCalls; player.recover(); await tick();
+  assert.equal(audio.playCalls, calls); assert.equal(player.wantPlay, false); assert.equal(player.status, 'paused');
+});
+
+test('background recovery handles an autoplay denial without a retry loop', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const audio = new FakeAudio(), player = new AudioPlayer(audio, { buffer: fakeBuffer(), isHidden: () => true, pauseRecoveryDelays: [30] });
+  player.start(tracks, 'a'); await tick(); audio.pause();
+  audio.play = () => Promise.reject(new DOMException('Blocked', 'NotAllowedError'));
+  t.mock.timers.tick(30); await tick();
+  assert.equal(player.status, 'blocked'); assert.equal(player.wantPlay, false); assert.equal(player.pauseRecoveryTimer, null);
+});
+
+test('stable playback replenishes the interruption budget while manual pause always wins', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const audio = new FakeAudio(), player = new AudioPlayer(audio, { buffer: fakeBuffer(), isHidden: () => true, pauseRecoveryDelays: [30] });
+  player.start(tracks, 'a'); await tick(); audio.pause(); t.mock.timers.tick(30); await tick();
+  assert.equal(player.pauseRecoveryCount, 1); audio.currentTime = 31; audio.dispatchEvent(new Event('timeupdate'));
+  assert.equal(player.pauseRecoveryCount, 0); audio.pause(); player.pause(); const calls = audio.playCalls;
+  t.mock.timers.tick(100); await tick(); assert.equal(audio.playCalls, calls); assert.equal(player.status, 'paused');
+});

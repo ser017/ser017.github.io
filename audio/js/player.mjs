@@ -4,13 +4,14 @@ import { PlaybackBuffer } from './reserve.mjs';
 import { directURL } from './prefetch.mjs';
 
 export class AudioPlayer extends EventTarget {
-  constructor(audio, { queue = new TrackQueue(), buffer = new PlaybackBuffer(), revokeURL = url => URL.revokeObjectURL(url), retryDelays = [1000, 3000, 7000, 15000, 30000, 60000, 60000, 60000], startupTimeoutMs = 25000, stalledTimeoutMs = 20000, report = recordAudioEvent } = {}) {
+  constructor(audio, { queue = new TrackQueue(), buffer = new PlaybackBuffer(), revokeURL = url => URL.revokeObjectURL(url), retryDelays = [1000, 3000, 7000, 15000, 30000, 60000, 60000, 60000], startupTimeoutMs = 25000, stalledTimeoutMs = 20000, pauseRecoveryDelays = [300, 1500], isHidden = () => globalThis.document?.hidden === true, report = recordAudioEvent } = {}) {
     super();
-    Object.assign(this, { audio, queue, buffer, revokeURL, retryDelays, startupTimeoutMs, stalledTimeoutMs, report });
+    Object.assign(this, { audio, queue, buffer, revokeURL, retryDelays, startupTimeoutMs, stalledTimeoutMs, pauseRecoveryDelays, isHidden, report });
     this.track = null; this.status = 'idle'; this.wantPlay = false; this.repeat = false;
     this.request = 0; this.activeBlob = null; this.candidates = []; this.sourceIndex = 0;
     this.error = ''; this.prefetchFor = null;
     this.retryTimer = null; this.retryCount = 0; this.resumeAt = 0; this.watchdog = null;
+    this.pauseRecoveryTimer = null; this.pauseRecoveryCount = 0; this.pauseRecoveryProgress = 0;
     this.buffer.onChange = () => {
       this.dispatchEvent(new Event('buffer'));
       if (this.track && this.wantPlay && ['loading', 'recovering'].includes(this.status)) {
@@ -21,19 +22,16 @@ export class AudioPlayer extends EventTarget {
     audio.autoplay = false;
     audio.addEventListener('playing', () => {
       if (!this.wantPlay) { audio.pause(); return; }
-      this.clearWatchdog(); this.status = 'playing'; this.error = ''; this.log('playing'); this.notify(); this.prepareNext();
+      this.clearWatchdog(); this.clearPauseRecovery(); this.status = 'playing'; this.error = ''; this.log('playing'); this.notify(); this.prepareNext();
     });
-    audio.addEventListener('pause', () => {
-      if (['loading', 'recovering'].includes(this.status) && this.wantPlay) return;
-      if (audio.ended || this.status === 'error') return;
-      this.wantPlay = false; this.clearRetry(); this.clearWatchdog(); this.buffer.suspend?.(); this.request++; this.status = this.track ? 'paused' : 'idle'; this.log('audio-pause'); this.notify();
-    });
+    audio.addEventListener('pause', event => this.handlePause(event));
     audio.addEventListener('waiting', () => {
-      if (this.wantPlay) { this.status = 'loading'; this.armWatchdog(this.stalledTimeoutMs); this.notify(); }
+      if (this.wantPlay) { if (this.status !== 'loading') this.log('audio-waiting'); this.status = 'loading'; this.armWatchdog(this.stalledTimeoutMs); this.notify(); }
     });
-    audio.addEventListener('stalled', () => { if (this.wantPlay) this.armWatchdog(this.stalledTimeoutMs); });
+    audio.addEventListener('stalled', () => { if (this.wantPlay) { this.log('audio-stalled'); this.armWatchdog(this.stalledTimeoutMs); } });
     audio.addEventListener('timeupdate', () => {
       if (this.wantPlay && !audio.paused && audio.readyState >= 3 && audio.currentTime !== this.lastProgress) { this.lastProgress = audio.currentTime; this.clearWatchdog(); }
+      if (!audio.paused && this.pauseRecoveryCount && audio.currentTime - this.pauseRecoveryProgress >= 30) this.pauseRecoveryCount = 0;
       this.dispatchEvent(new Event('progress'));
       if (this.wantPlay && !audio.paused && audio.readyState >= 3) this.prepareNext();
     });
@@ -46,7 +44,7 @@ export class AudioPlayer extends EventTarget {
     audio.addEventListener('error', () => { if (audio.error) this.sourceFailed(audio.error); });
     audio.addEventListener('ended', () => {
       if (this.repeat || !this.wantPlay) return;
-      this.clearRetry(); this.clearWatchdog(); this.log('ended');
+      this.clearRetry(); this.clearWatchdog(); this.clearPauseRecovery(); this.log('ended');
       const next = this.queue.next();
       // Один и тот же audio-элемент и немедленный play(), независимо от visibilityState.
       if (next) this.select(next, true);
@@ -57,7 +55,36 @@ export class AudioPlayer extends EventTarget {
     this.report(event, { track: this.track?.name || null, status: this.status, wantPlay: this.wantPlay,
       source: this.audio.src?.startsWith('blob:') ? 'buffered' : this.audio.src === directURL(this.track?.url || 'https://invalid.local') ? 'direct' : 'original',
       sourceIndex: this.sourceIndex, retry: this.retryCount, currentTime: this.audio.currentTime || 0,
-      readyState: this.audio.readyState, networkState: this.audio.networkState, reserve: this.bufferState, ...details });
+      readyState: this.audio.readyState, networkState: this.audio.networkState, paused: this.audio.paused, ended: this.audio.ended,
+      duration: Number.isFinite(this.audio.duration) ? this.audio.duration : null, pauseRecovery: this.pauseRecoveryCount,
+      reserve: this.bufferState, ...details });
+  }
+  clearPauseRecovery() { if (this.pauseRecoveryTimer !== null) clearTimeout(this.pauseRecoveryTimer); this.pauseRecoveryTimer = null; }
+  handlePause(event) {
+    // load()/source changes can deliver a pause event after a newer play().
+    if (!this.audio.paused) { this.log('stale-pause-ignored'); return; }
+    if (this.audio.ended || this.audio.error || this.status === 'error') return;
+    if (this.wantPlay && this.track && this.isHidden()) {
+      this.clearRetry(); this.clearWatchdog(); this.buffer.suspend?.();
+      // Repeated pause events do not consume retries or postpone a pending retry.
+      if (this.status === 'interrupted') { this.log('audio-pause-repeat'); return; }
+      this.request++; this.status = 'interrupted';
+      this.log('audio-interrupted', { trusted: event?.isTrusted === true });
+      if (this.pauseRecoveryCount < this.pauseRecoveryDelays.length) {
+        const token = this.request, delay = this.pauseRecoveryDelays[this.pauseRecoveryCount];
+        this.pauseRecoveryTimer = setTimeout(() => {
+          this.pauseRecoveryTimer = null;
+          if (token !== this.request || !this.wantPlay || !this.audio.paused || this.status !== 'interrupted') return;
+          this.pauseRecoveryCount++; this.pauseRecoveryProgress = this.audio.currentTime;
+          this.log('pause-recovery-start'); this.play();
+        }, delay);
+        this.pauseRecoveryTimer?.unref?.();
+        this.log('pause-recovery-scheduled', { delayMs: delay });
+      } else this.log('pause-recovery-limited');
+      this.notify(); return;
+    }
+    this.wantPlay = false; this.clearRetry(); this.clearWatchdog(); this.clearPauseRecovery(); this.buffer.suspend?.();
+    this.request++; this.status = this.track ? 'paused' : 'idle'; this.log('audio-pause'); this.notify();
   }
   clearRetry() { if (this.retryTimer !== null) clearTimeout(this.retryTimer); this.retryTimer = null; }
   clearWatchdog() { if (this.watchdog !== null) clearTimeout(this.watchdog); this.watchdog = null; }
@@ -72,6 +99,10 @@ export class AudioPlayer extends EventTarget {
   }
   recover() {
     if (!this.wantPlay) return;
+    if (this.status === 'interrupted') {
+      if (!this.isHidden()) { this.log('pause-recovery-visible'); this.play(); }
+      return;
+    }
     this.prepareNext(); this.buffer.retryNow?.();
     if (this.status === 'recovering' && this.retryTimer !== null) {
       this.clearRetry(); this.log('connection-retry'); this.retryCurrent();
@@ -88,7 +119,8 @@ export class AudioPlayer extends EventTarget {
   }
   select(track, autoplay) {
     if (!track?.url) return;
-    this.clearRetry(); this.clearWatchdog(); this.retryCount = 0; this.resumeAt = 0; this.lastProgress = null;
+    this.clearRetry(); this.clearWatchdog(); this.clearPauseRecovery(); this.pauseRecoveryCount = 0; this.pauseRecoveryProgress = 0;
+    this.retryCount = 0; this.resumeAt = 0; this.lastProgress = null;
     const prepared = this.buffer.take(track.name);
     if (!this.buffer.prepareQueue) this.buffer.cancel(); this.prefetchFor = null;
     const previousBlob = this.activeBlob;
@@ -104,7 +136,7 @@ export class AudioPlayer extends EventTarget {
     if (!prepared) this.restoreCurrent();
   }
   usePrepared(url) {
-    this.clearRetry();
+    this.clearRetry(); this.clearPauseRecovery();
     const previousBlob = this.activeBlob;
     this.activeBlob = url;
     this.candidates = [...new Set([url, directURL(this.track.url), this.track.url])];
@@ -133,7 +165,7 @@ export class AudioPlayer extends EventTarget {
   play() {
     if (!this.track) return;
     if (this.status === 'error' || this.audio.error) { this.retry(); return; }
-    this.clearRetry();
+    this.clearRetry(); this.clearPauseRecovery();
     this.wantPlay = true; this.error = ''; this.status = 'loading'; this.armWatchdog(this.startupTimeoutMs); this.notify();
     const token = this.request;
     const failed = error => {
@@ -147,11 +179,14 @@ export class AudioPlayer extends EventTarget {
     try { Promise.resolve(this.audio.play()).catch(failed); }
     catch (error) { failed(error); }
   }
-  pause() {
-    this.wantPlay = false; this.clearRetry(); this.clearWatchdog(); this.buffer.suspend?.(); this.request++; this.audio.pause();
-    this.status = this.track ? 'paused' : 'idle'; this.log('user-pause'); this.notify();
+  pause(origin = 'page') {
+    this.wantPlay = false; this.clearRetry(); this.clearWatchdog(); this.clearPauseRecovery(); this.buffer.suspend?.(); this.request++; this.audio.pause();
+    this.status = this.track ? 'paused' : 'idle'; this.log('user-pause', { origin }); this.notify();
   }
-  toggle() { if (this.wantPlay) this.pause(); else if (this.status === 'error') this.retry(); else this.play(); }
+  toggle() {
+    if (this.status === 'interrupted' && this.pauseRecoveryTimer === null) this.play();
+    else if (this.wantPlay) this.pause(); else if (this.status === 'error') this.retry(); else this.play();
+  }
   retry() { if (this.track) this.select(this.track, true); }
   next() { const track = this.queue.next(); if (track) this.select(track, true); }
   previous() {
@@ -216,7 +251,7 @@ export class AudioPlayer extends EventTarget {
       }, delay);
       this.notify(); return;
     }
-    this.wantPlay = false; this.clearWatchdog(); this.buffer.suspend?.(); this.request++; this.audio.pause(); this.status = 'error';
+    this.wantPlay = false; this.clearWatchdog(); this.clearPauseRecovery(); this.buffer.suspend?.(); this.request++; this.audio.pause(); this.status = 'error';
     this.error = 'Не удалось загрузить трек. Проверьте соединение и попробуйте ещё раз.';
     this.log('playback-error'); this.notify();
   }
