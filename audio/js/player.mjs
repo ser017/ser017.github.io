@@ -1,29 +1,39 @@
 import { recordAudioEvent, errorDetails } from './diagnostics.mjs';
 import { TrackQueue } from './queue.mjs';
-import { NextTrackBuffer, directURL } from './prefetch.mjs';
+import { PlaybackBuffer } from './reserve.mjs';
+import { directURL } from './prefetch.mjs';
 
 export class AudioPlayer extends EventTarget {
-  constructor(audio, { queue = new TrackQueue(), buffer = new NextTrackBuffer(), revokeURL = url => URL.revokeObjectURL(url), retryDelays = [1000, 3000, 7000], report = recordAudioEvent } = {}) {
+  constructor(audio, { queue = new TrackQueue(), buffer = new PlaybackBuffer(), revokeURL = url => URL.revokeObjectURL(url), retryDelays = [1000, 3000, 7000, 15000, 30000, 60000, 60000, 60000], startupTimeoutMs = 25000, stalledTimeoutMs = 20000, report = recordAudioEvent } = {}) {
     super();
-    Object.assign(this, { audio, queue, buffer, revokeURL, retryDelays, report });
+    Object.assign(this, { audio, queue, buffer, revokeURL, retryDelays, startupTimeoutMs, stalledTimeoutMs, report });
     this.track = null; this.status = 'idle'; this.wantPlay = false; this.repeat = false;
     this.request = 0; this.activeBlob = null; this.candidates = []; this.sourceIndex = 0;
     this.error = ''; this.prefetchFor = null;
-    this.retryTimer = null; this.retryCount = 0; this.resumeAt = 0;
+    this.retryTimer = null; this.retryCount = 0; this.resumeAt = 0; this.watchdog = null;
+    this.buffer.onChange = () => {
+      this.dispatchEvent(new Event('buffer'));
+      if (this.track && this.wantPlay && ['loading', 'recovering'].includes(this.status)) {
+        const prepared = this.buffer.take(this.track.name);
+        if (prepared) this.usePrepared(prepared);
+      }
+    };
     audio.autoplay = false;
     audio.addEventListener('playing', () => {
       if (!this.wantPlay) { audio.pause(); return; }
-      this.status = 'playing'; this.error = ''; this.log('playing'); this.notify(); this.prepareNext();
+      this.clearWatchdog(); this.status = 'playing'; this.error = ''; this.log('playing'); this.notify(); this.prepareNext();
     });
     audio.addEventListener('pause', () => {
       if (['loading', 'recovering'].includes(this.status) && this.wantPlay) return;
       if (audio.ended || this.status === 'error') return;
-      this.wantPlay = false; this.clearRetry(); this.request++; this.status = this.track ? 'paused' : 'idle'; this.log('audio-pause'); this.notify();
+      this.wantPlay = false; this.clearRetry(); this.clearWatchdog(); this.buffer.suspend?.(); this.request++; this.status = this.track ? 'paused' : 'idle'; this.log('audio-pause'); this.notify();
     });
     audio.addEventListener('waiting', () => {
-      if (this.wantPlay) { this.status = 'loading'; this.notify(); }
+      if (this.wantPlay) { this.status = 'loading'; this.armWatchdog(this.stalledTimeoutMs); this.notify(); }
     });
+    audio.addEventListener('stalled', () => { if (this.wantPlay) this.armWatchdog(this.stalledTimeoutMs); });
     audio.addEventListener('timeupdate', () => {
+      if (this.wantPlay && !audio.paused && audio.readyState >= 3 && audio.currentTime !== this.lastProgress) { this.lastProgress = audio.currentTime; this.clearWatchdog(); }
       this.dispatchEvent(new Event('progress'));
       if (this.wantPlay && !audio.paused && audio.readyState >= 3) this.prepareNext();
     });
@@ -36,7 +46,7 @@ export class AudioPlayer extends EventTarget {
     audio.addEventListener('error', () => { if (audio.error) this.sourceFailed(audio.error); });
     audio.addEventListener('ended', () => {
       if (this.repeat || !this.wantPlay) return;
-      this.clearRetry(); this.log('ended');
+      this.clearRetry(); this.clearWatchdog(); this.log('ended');
       const next = this.queue.next();
       // Один и тот же audio-элемент и немедленный play(), независимо от visibilityState.
       if (next) this.select(next, true);
@@ -47,9 +57,27 @@ export class AudioPlayer extends EventTarget {
     this.report(event, { track: this.track?.name || null, status: this.status, wantPlay: this.wantPlay,
       source: this.audio.src?.startsWith('blob:') ? 'buffered' : this.audio.src === directURL(this.track?.url || 'https://invalid.local') ? 'direct' : 'original',
       sourceIndex: this.sourceIndex, retry: this.retryCount, currentTime: this.audio.currentTime || 0,
-      readyState: this.audio.readyState, networkState: this.audio.networkState, ...details });
+      readyState: this.audio.readyState, networkState: this.audio.networkState, reserve: this.bufferState, ...details });
   }
   clearRetry() { if (this.retryTimer !== null) clearTimeout(this.retryTimer); this.retryTimer = null; }
+  clearWatchdog() { if (this.watchdog !== null) clearTimeout(this.watchdog); this.watchdog = null; }
+  armWatchdog(ms) {
+    if (this.watchdog !== null) return;
+    const token = this.request;
+    this.watchdog = setTimeout(() => {
+      this.watchdog = null;
+      if (token === this.request && this.wantPlay) this.sourceFailed({ name: 'TimeoutError', message: 'Audio made no progress before timeout' });
+    }, ms);
+    this.watchdog?.unref?.();
+  }
+  recover() {
+    if (!this.wantPlay) return;
+    this.prepareNext(); this.buffer.retryNow?.();
+    if (this.status === 'recovering' && this.retryTimer !== null) {
+      this.clearRetry(); this.log('connection-retry'); this.retryCurrent();
+    }
+  }
+  get bufferState() { return this.buffer.state || { ready: 0, total: 0 }; }
   notify() { this.dispatchEvent(new Event('state')); }
   start(tracks, id, { shuffle = this.queue.shuffle } = {}) {
     const playable = tracks.filter(track => track.url);
@@ -60,9 +88,9 @@ export class AudioPlayer extends EventTarget {
   }
   select(track, autoplay) {
     if (!track?.url) return;
-    this.clearRetry(); this.retryCount = 0; this.resumeAt = 0;
+    this.clearRetry(); this.clearWatchdog(); this.retryCount = 0; this.resumeAt = 0; this.lastProgress = null;
     const prepared = this.buffer.take(track.name);
-    this.buffer.cancel(); this.prefetchFor = null;
+    if (!this.buffer.prepareQueue) this.buffer.cancel(); this.prefetchFor = null;
     const previousBlob = this.activeBlob;
     this.activeBlob = prepared;
     this.track = track; this.wantPlay = autoplay; this.status = autoplay ? 'loading' : 'paused'; this.error = '';
@@ -73,17 +101,45 @@ export class AudioPlayer extends EventTarget {
     if (previousBlob && previousBlob !== prepared) this.revokeURL(previousBlob);
     this.log('select', { buffered: Boolean(prepared) }); this.notify();
     if (autoplay) this.play();
+    if (!prepared) this.restoreCurrent();
+  }
+  usePrepared(url) {
+    this.clearRetry();
+    const previousBlob = this.activeBlob;
+    this.activeBlob = url;
+    this.candidates = [...new Set([url, directURL(this.track.url), this.track.url])];
+    this.log('cache-restore'); this.loadCandidate(0);
+    if (previousBlob && previousBlob !== url) this.revokeURL(previousBlob);
+  }
+  restoreCurrent(fallbackToNetwork = false) {
+    if (!this.track || !this.wantPlay) return;
+    const prepared = this.buffer.take(this.track.name);
+    if (prepared) { this.usePrepared(prepared); return; }
+    if (!this.buffer.restore) { if (fallbackToNetwork) this.loadCandidate(0); return; }
+    const token = this.request;
+    void this.buffer.restore(this.track).then(url => {
+      if (token !== this.request || !this.wantPlay || this.status === 'playing') { if (url) this.revokeURL(url); return; }
+      if (url) this.usePrepared(url);
+      else if (fallbackToNetwork) this.loadCandidate(0);
+    }).catch(error => {
+      this.log('cache-restore-failed', errorDetails(error));
+      if (fallbackToNetwork && token === this.request && this.wantPlay) this.loadCandidate(0);
+    });
+  }
+  retryCurrent() {
+    this.candidates = [...new Set([directURL(this.track.url), this.track.url])]; this.sourceIndex = 0;
+    this.armWatchdog(this.startupTimeoutMs); this.restoreCurrent(true);
   }
   play() {
     if (!this.track) return;
     if (this.status === 'error' || this.audio.error) { this.retry(); return; }
     this.clearRetry();
-    this.wantPlay = true; this.error = ''; this.status = 'loading'; this.notify();
+    this.wantPlay = true; this.error = ''; this.status = 'loading'; this.armWatchdog(this.startupTimeoutMs); this.notify();
     const token = this.request;
     const failed = error => {
       if (token !== this.request || !this.wantPlay || error.name === 'AbortError') return;
       if (error.name === 'NotAllowedError') {
-        this.wantPlay = false; this.clearRetry(); this.status = 'blocked';
+        this.wantPlay = false; this.clearRetry(); this.clearWatchdog(); this.buffer.suspend?.(); this.status = 'blocked';
         this.error = 'Нажмите ▶, чтобы продолжить воспроизведение.';
         this.log('play-blocked', errorDetails(error)); this.notify();
       } else this.sourceFailed(error);
@@ -92,7 +148,7 @@ export class AudioPlayer extends EventTarget {
     catch (error) { failed(error); }
   }
   pause() {
-    this.wantPlay = false; this.clearRetry(); this.request++; this.audio.pause();
+    this.wantPlay = false; this.clearRetry(); this.clearWatchdog(); this.buffer.suspend?.(); this.request++; this.audio.pause();
     this.status = this.track ? 'paused' : 'idle'; this.log('user-pause'); this.notify();
   }
   toggle() { if (this.wantPlay) this.pause(); else if (this.status === 'error') this.retry(); else this.play(); }
@@ -109,25 +165,31 @@ export class AudioPlayer extends EventTarget {
     this.dispatchEvent(new Event('progress'));
   }
   setShuffle(value) {
-    this.queue.setShuffle(value); this.buffer.cancel(); this.prefetchFor = null;
+    this.queue.setShuffle(value); if (!this.buffer.prepareQueue) this.buffer.cancel(); this.prefetchFor = null;
     if (this.wantPlay && !this.audio.paused) this.prepareNext();
     this.notify();
   }
   setRepeat(value) {
     this.repeat = Boolean(value); this.audio.loop = this.repeat;
-    this.buffer.cancel(); this.prefetchFor = null;
-    if (!this.repeat && this.wantPlay && !this.audio.paused) this.prepareNext();
+    if (!this.buffer.prepareQueue) this.buffer.cancel(); this.prefetchFor = null;
+    if (this.buffer.prepareQueue || (!this.repeat && this.wantPlay && !this.audio.paused)) this.prepareNext();
     this.notify();
   }
   updateQueue(action, ...args) {
     if (!this.queue[action](...args)) return;
-    this.buffer.cancel(); this.prefetchFor = null;
-    if (!this.repeat && this.wantPlay && !this.audio.paused) this.prepareNext();
+    if (!this.buffer.prepareQueue) this.buffer.cancel(); this.prefetchFor = null;
+    if (this.buffer.prepareQueue || (!this.repeat && this.wantPlay && !this.audio.paused)) this.prepareNext();
     this.notify();
   }
   removeUpcoming(index) { this.updateQueue('removeUpcoming', index); }
   moveUpcoming(from, to) { this.updateQueue('moveUpcoming', from, to); }
   prepareNext() {
+    if (this.buffer.prepareQueue) {
+      if (this.repeat) { this.buffer.suspend(); return; }
+      this.buffer.prepareQueue(this.queue.upcoming);
+      if (!this.wantPlay) this.buffer.suspend();
+      return;
+    }
     const next = this.repeat ? null : this.queue.nextTrack;
     if (!next || this.prefetchFor === next.name) return;
     this.prefetchFor = next.name;
@@ -135,7 +197,7 @@ export class AudioPlayer extends EventTarget {
   }
   sourceFailed(error) {
     if (!this.track || this.status === 'error' || this.retryTimer !== null) return;
-    this.log('source-failed', errorDetails(error));
+    this.clearWatchdog(); this.log('source-failed', errorDetails(error));
     this.resumeAt = Math.max(this.resumeAt, this.audio.currentTime || 0);
     if (this.sourceIndex + 1 < this.candidates.length) {
       this.loadCandidate(this.sourceIndex + 1);
@@ -150,17 +212,16 @@ export class AudioPlayer extends EventTarget {
         this.retryTimer = null;
         if (token !== this.request || !this.wantPlay) return;
         // Keep the same track and queue position; retry the network sources.
-        this.candidates = [...new Set([directURL(this.track.url), this.track.url])];
-        this.log('retry-start'); this.loadCandidate(0);
+        this.log('retry-start'); this.retryCurrent();
       }, delay);
       this.notify(); return;
     }
-    this.wantPlay = false; this.request++; this.audio.pause(); this.status = 'error';
+    this.wantPlay = false; this.clearWatchdog(); this.buffer.suspend?.(); this.request++; this.audio.pause(); this.status = 'error';
     this.error = 'Не удалось загрузить трек. Проверьте соединение и попробуйте ещё раз.';
     this.log('playback-error'); this.notify();
   }
   loadCandidate(index) {
-    this.sourceIndex = index; this.request++;
+    this.clearWatchdog(); this.sourceIndex = index; this.request++;
     this.status = this.wantPlay ? 'loading' : 'paused';
     this.audio.src = this.candidates[index]; this.audio.load();
     this.log('load-source'); this.notify(); if (this.wantPlay) this.play();

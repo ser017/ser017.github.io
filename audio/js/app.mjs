@@ -195,15 +195,19 @@ function renderPlayer() {
   }
   for (const id of ['next', 'bottom-next']) $(id).disabled = !player.queue.nextTrack;
   for (const id of ['prev', 'bottom-prev']) $(id).disabled = !track;
-  showReport ||= ['error', 'blocked', 'recovering'].includes(player.status);
+  renderFeedback();
+  highlight(); syncMediaSession(); updateProgress(); renderQueue();
+}
+function renderFeedback() {
+  showReport ||= ['error', 'blocked', 'recovering'].includes(player.status) || player.buffer.hadFailure;
   reportButton.hidden = !showReport;
   if (player.status === 'recovering') setStatus(`Повторная загрузка трека… (${player.retryCount}/${player.retryDelays.length})`);
   else if (player.status === 'error') setStatus(player.error, () => player.retry());
   else if (player.status === 'blocked') setStatus(player.error);
   else if (player.status === 'loading') setStatus('Загрузка трека…');
   else if (player.status === 'ended') setStatus('Плейлист закончился.');
+  else if (player.track && player.bufferState.total) setStatus(`Загружено вперёд: ${player.bufferState.ready} из ${player.bufferState.total}`);
   else setStatus('');
-  highlight(); syncMediaSession(); updateProgress(); renderQueue();
 }
 function updateProgress() {
   const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
@@ -227,7 +231,7 @@ function syncMediaSession() {
       metadataId = track.name;
       navigator.mediaSession.metadata = new MediaMetadata({ title: track.title || '', artist: track.artist || '', album: track.album || '', artwork: track.cover ? [{ src: track.cover }] : [] });
     }
-    navigator.mediaSession.playbackState = !track ? 'none' : audio.paused ? 'paused' : 'playing';
+    navigator.mediaSession.playbackState = !track ? 'none' : player.wantPlay ? 'playing' : 'paused';
   } catch {}
 }
 function volumeChanged() {
@@ -289,6 +293,9 @@ for (const id of ['seekbar', 'bp-seek']) {
 }
 player.addEventListener('state', renderPlayer); player.addEventListener('progress', updateProgress);
 player.addEventListener('volume', volumeChanged);
+player.addEventListener('buffer', renderFeedback);
+for (const event of ['online', 'pageshow']) window.addEventListener(event, () => player.recover());
+for (const event of ['resume', 'visibilitychange']) document.addEventListener(event, () => { if (!document.hidden) player.recover(); });
 if ('mediaSession' in navigator) {
   const actions = {
     play: () => { if (player.status === 'error') player.retry(); else if (player.track) player.play(); else togglePlayback(); },

@@ -1,6 +1,7 @@
 const key = 'ser017-audio-diagnostics-v1';
-const limit = 120;
-export const playbackVersion = '2026-10-31-recovery-2';
+const limit = 240;
+export const playbackVersion = '2026-10-31-reserve-3';
+const session = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 let events = [];
 try {
   const saved = JSON.parse(globalThis.localStorage?.getItem(key) || '[]');
@@ -16,7 +17,7 @@ export function errorDetails(error) {
   };
 }
 export function recordAudioEvent(event, details = {}) {
-  events.push({ time: new Date().toISOString(), version: playbackVersion, event,
+  events.push({ time: new Date().toISOString(), version: playbackVersion, session, event,
     visibility: globalThis.document?.visibilityState || 'unknown', online: globalThis.navigator?.onLine ?? null, ...details });
   events = events.slice(-limit);
   try { globalThis.localStorage?.setItem(key, JSON.stringify(events)); } catch {}

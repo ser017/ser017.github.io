@@ -76,7 +76,7 @@ test('a late failed play promise from the previous song cannot break the current
 test('cancelled prefetch cannot overwrite a newer next track, and take transfers ownership', async () => {
   const pending = new Map(), revoked = [];
   const buffer = new NextTrackBuffer({ fetcher: url => new Promise(resolve => pending.set(url, resolve)), makeURL: () => 'blob:next', revokeURL: url => revoked.push(url) });
-  const a = buffer.prepare(tracks[0]); const b = buffer.prepare(tracks[1]);
+  const a = buffer.prepare(tracks[0]); await tick(); const b = buffer.prepare(tracks[1]); await tick();
   const response = () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'audio/mpeg' } });
   pending.get(tracks[1].url)(response()); await b;
   pending.get(tracks[0].url)(response()); await a;
@@ -139,7 +139,7 @@ test('prefetch timeout is recorded and retried only within its attempt limit', a
   const buffer = new NextTrackBuffer({ timeoutMs: 40, retryDelays: [10], report: (event, details) => log.push({ event, ...details }), fetcher: (url, { signal }) => {
     calls++; return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(new DOMException('timeout', 'AbortError')), { once: true }));
   } });
-  const done = buffer.prepare(tracks[1]); t.mock.timers.tick(40); await tick();
+  const done = buffer.prepare(tracks[1]); await tick(); t.mock.timers.tick(40); await tick();
   t.mock.timers.tick(10); await tick(); t.mock.timers.tick(40); await done;
   assert.equal(calls, 2); assert.equal(buffer.ready, null);
   assert(log.filter(x => x.event === 'prefetch-failed').every(x => x.timedOut));
@@ -205,8 +205,8 @@ test('diagnostic report is bounded and strips shared URLs from errors', async ()
   const { recordAudioEvent, audioReport, errorDetails } = await import('../js/diagnostics.mjs');
   const details = errorDetails(new Error('Failed https://www.dropbox.com/s/token?rlkey=secret'));
   assert(!details.errorMessage.includes('secret')); assert(details.errorMessage.includes('[URL]'));
-  for (let i = 0; i < 130; i++) recordAudioEvent('bounded-test', { index: i });
-  const report = audioReport(); assert.equal(report.events.length, 120); assert.equal(report.events.at(-1).index, 129);
+  for (let i = 0; i < 250; i++) recordAudioEvent('bounded-test', { index: i });
+  const report = audioReport(); assert.equal(report.events.length, 240); assert.equal(report.events.at(-1).index, 249);
 });
 
 test('default prefetch calls browser fetch with its global receiver', async t => {
@@ -216,4 +216,140 @@ test('default prefetch calls browser fetch with its global receiver', async t =>
   });
   const buffer = new NextTrackBuffer({ retryDelays: [], makeURL: () => 'blob:browser-fetch' });
   assert.equal(await buffer.prepare(tracks[1]), true); assert.equal(buffer.take('b'), 'blob:browser-fetch');
+});
+import { AudioFileCache } from '../js/audio-cache.mjs';
+import { PlaybackBuffer } from '../js/reserve.mjs';
+
+class MemoryCache {
+  constructor() { this.entries = new Map(); }
+  async match(key) { const r = this.entries.get(String(key)); return r ? new Response(r.bytes, { status: r.status, headers: r.headers }) : undefined; }
+  async put(key, response) { const bytes = new Uint8Array(await response.arrayBuffer()); this.entries.set(String(key), { bytes, status: response.status, headers: [...response.headers] }); }
+  async delete(key) { return this.entries.delete(String(key)); }
+}
+const audioResponse = (size = 3) => new Response(new Uint8Array(size), { headers: { 'content-type': 'audio/mpeg', 'content-length': String(size) } });
+const noCache = { get: async () => null, open: async () => null };
+const settle = async () => { for (let i = 0; i < 12; i++) await tick(); };
+
+test('full audio files persist across cache instances without refetching', async () => {
+  const disk = new MemoryCache(), storage = { open: async () => disk };
+  const cache = new AudioFileCache({ storage }); const log = []; let calls = 0;
+  const buffer = new NextTrackBuffer({ cache, memoryBytes: 2, maxBytes: 20, retryDelays: [], makeURL: b => `blob:${b.size}`, report: (event, details) => log.push({ event, ...details }), fetcher: async () => { calls++; return audioResponse(12); } });
+  assert.equal(await buffer.prepare(tracks[1]), true); assert.equal(buffer.take('b'), 'blob:12');
+  const restored = new NextTrackBuffer({ cache: new AudioFileCache({ storage }), retryDelays: [], makeURL: b => `blob:${b.size}`, fetcher: async () => { throw new Error('must not fetch cached file'); } });
+  assert.equal(await restored.prepare(tracks[1]), true); assert.equal(restored.take('b'), 'blob:12'); assert.equal(calls, 1);
+});
+
+test('cache byte budget removes the oldest audio files while keeping newer ones', async () => {
+  const disk = new MemoryCache(), cache = new AudioFileCache({ storage: { open: async () => disk }, maxBytes: 6 });
+  for (const track of tracks.slice(0, 3)) await cache.put(track, audioResponse(3), { maxBytes: 10 });
+  assert.equal(await cache.get(tracks[0]), null);
+  assert.equal((await cache.get(tracks[1])).size, 3); assert.equal((await cache.get(tracks[2])).size, 3);
+});
+
+test('partial or truncated responses never become cached playable files', async () => {
+  const disk = new MemoryCache(), cache = new AudioFileCache({ storage: { open: async () => disk } });
+  const response = new Response(new Uint8Array(3), { headers: { 'content-type': 'audio/mpeg', 'content-length': '12' } });
+  await assert.rejects(cache.put(tracks[1], response, { maxBytes: 20 }), /Incomplete/);
+  assert.equal(await cache.get(tracks[1]), null);
+});
+
+test('unavailable persistent storage still supports small in-memory tracks', async () => {
+  const cache = new AudioFileCache({ storage: { open: async () => { throw new DOMException('disabled', 'SecurityError'); } } });
+  const buffer = new NextTrackBuffer({ cache, retryDelays: [], makeURL: () => 'blob:fallback', fetcher: async () => audioResponse(3) });
+  assert.equal(await buffer.prepare(tracks[1]), true); assert.equal(buffer.take('b'), 'blob:fallback');
+});
+
+test('reserve downloads five future tracks with at most two concurrent requests', async () => {
+  const many = ['a','b','c','d','e','f','g'].map(name => ({ name, url: `https://example.invalid/${name}` }));
+  let running = 0, peak = 0, calls = 0;
+  const reserve = new PlaybackBuffer({ cache: noCache, createBuffer: options => new NextTrackBuffer({ ...options, retryDelays: [], makeURL: () => 'blob:ready', fetcher: async () => {
+    calls++; running++; peak = Math.max(peak, running); await tick(); running--; return audioResponse();
+  } }) });
+  reserve.prepareQueue(many); await settle();
+  assert.equal(reserve.state.ready, 5); assert.equal(calls, 5); assert(peak <= 2); reserve.cancel();
+});
+
+test('moving or consuming a reserved track preserves the other prepared files', async () => {
+  let calls = 0; const revoked = [];
+  const reserve = new PlaybackBuffer({ cache: noCache, createBuffer: options => new NextTrackBuffer({ ...options, retryDelays: [], makeURL: () => `blob:${++calls}`, revokeURL: url => revoked.push(url), fetcher: async () => audioResponse() }) });
+  reserve.prepareQueue(tracks.slice(1)); await settle(); assert.equal(reserve.state.ready, 3);
+  reserve.prepareQueue([tracks[3], tracks[1], tracks[2]]); await settle(); assert.equal(calls, 3); assert.equal(revoked.length, 0);
+  const url = reserve.take('d'); assert(url.startsWith('blob:'));
+  reserve.prepareQueue(tracks.slice(1, 3)); await settle(); assert.equal(reserve.state.ready, 2); assert.equal(calls, 3); assert(!revoked.includes(url)); reserve.cancel();
+});
+
+test('temporary reserve failures are retried after the initial attempts run out', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] }); let calls = 0;
+  const reserve = new PlaybackBuffer({ cache: noCache, retryMs: 30, createBuffer: options => new NextTrackBuffer({ ...options, retryDelays: [], makeURL: () => 'blob:retry', fetcher: async () => {
+    calls++; if (calls === 1) throw new Error('offline'); return audioResponse();
+  } }) });
+  reserve.prepareQueue([tracks[1]]); await settle(); assert.equal(reserve.state.ready, 0);
+  t.mock.timers.tick(30); await settle(); assert.equal(calls, 2); assert.equal(reserve.state.ready, 1); reserve.cancel();
+});
+
+test('manual pause stops reserve retries without discarding prepared files', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] }); let calls = 0;
+  const reserve = new PlaybackBuffer({ cache: noCache, retryMs: 30, createBuffer: options => new NextTrackBuffer({ ...options, retryDelays: [], makeURL: () => 'blob:good', fetcher: async url => {
+    calls++; if (url === tracks[2].url) throw new Error('offline'); return audioResponse();
+  } }) });
+  reserve.prepareQueue(tracks.slice(1, 3)); await settle(); reserve.suspend(); const before = calls;
+  t.mock.timers.tick(300); await settle(); assert.equal(calls, before); assert.equal(reserve.state.ready, 1);
+  reserve.prepareQueue([tracks[1]]); await settle(); assert.equal(reserve.state.ready, 1); reserve.cancel();
+});
+
+test('reserve limits the total bytes retained as object URLs', async () => {
+  const reserve = new PlaybackBuffer({ cache: noCache, maxReadyBytes: 5, createBuffer: options => new NextTrackBuffer({ ...options, retryDelays: [], makeURL: () => 'blob:limit', revokeURL: () => {}, fetcher: async () => audioResponse(3) }) });
+  reserve.prepareQueue(tracks.slice(1)); await settle(); assert(reserve.state.bytes <= 5); assert.equal(reserve.state.ready, 1); reserve.cancel();
+});
+
+test('startup watchdog recovers a request that never reports playing or error', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] }); const audio = new FakeAudio(); audio.play = () => new Promise(() => {});
+  const player = new AudioPlayer(audio, { buffer: fakeBuffer(), startupTimeoutMs: 10, retryDelays: [20] });
+  player.start(tracks, 'a'); t.mock.timers.tick(10); await tick();
+  assert.equal(player.status, 'recovering'); assert.equal(player.track.name, 'a'); player.pause();
+});
+
+test('a late disk-cache lookup cannot resume playback after manual pause', async () => {
+  const audio = new FakeAudio(), revoked = []; audio.play = () => new Promise(() => {});
+  let resolveCache; const buffer = fakeBuffer(); buffer.restore = () => new Promise(resolve => { resolveCache = resolve; });
+  const player = new AudioPlayer(audio, { buffer, revokeURL: url => revoked.push(url) });
+  player.start(tracks, 'a'); player.pause(); resolveCache('blob:late'); await tick();
+  assert.equal(player.wantPlay, false); assert.notEqual(audio.src, 'blob:late'); assert.deepEqual(revoked, ['blob:late']);
+});
+
+test('a full cache keeps existing files readable and falls back to memory for new small songs', async () => {
+  const disk = new MemoryCache(), cache = new AudioFileCache({ storage: { open: async () => disk } });
+  await cache.put(tracks[0], audioResponse(), { maxBytes: 20 });
+  disk.put = async () => { throw new DOMException('Storage full', 'QuotaExceededError'); };
+  await assert.rejects(cache.put(tracks[1], audioResponse(), { maxBytes: 20 }), { name: 'QuotaExceededError' });
+  assert.equal((await cache.get(tracks[0])).size, 3); assert.equal(await cache.writable(), false);
+  const buffer = new NextTrackBuffer({ cache, retryDelays: [], makeURL: () => 'blob:memory', fetcher: async () => audioResponse() });
+  assert.equal(await buffer.prepare(tracks[1]), true); assert.equal(buffer.take('b'), 'blob:memory');
+});
+
+test('a reserve download finishing during a failed transition immediately rescues the same song', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const audio = new FakeAudio(), originalPlay = audio.play.bind(audio), buffer = fakeBuffer(); let ready = null;
+  buffer.prepareQueue = () => {};
+  buffer.take = id => { if (id !== ready) return null; ready = null; buffer.onChange(); return 'blob:late-reserve'; };
+  audio.play = () => audio.src === tracks[1].url ? Promise.reject(new Error('offline')) : originalPlay();
+  const player = new AudioPlayer(audio, { buffer, retryDelays: [30] });
+  player.start(tracks, 'a'); await tick(); player.next(); await tick();
+  assert.equal(player.status, 'recovering');
+  ready = 'b'; buffer.onChange(); await tick();
+  assert.equal(audio.src, 'blob:late-reserve'); assert.equal(player.status, 'playing'); assert.equal(player.queue.current.name, 'b');
+  const calls = audio.playCalls; t.mock.timers.tick(100); await tick(); assert.equal(audio.playCalls, calls);
+  player.pause();
+});
+
+test('each playback retry can restore a file that became available in the persistent cache', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const audio = new FakeAudio(), originalPlay = audio.play.bind(audio), buffer = fakeBuffer(); let cached = false;
+  buffer.restore = async () => cached ? 'blob:newly-cached' : null;
+  audio.play = () => audio.src.startsWith('blob:') ? originalPlay() : Promise.reject(new Error('offline'));
+  const player = new AudioPlayer(audio, { buffer, retryDelays: [30] });
+  player.start(tracks, 'a'); await tick(); assert.equal(player.status, 'recovering');
+  cached = true; t.mock.timers.tick(30); await tick();
+  assert.equal(audio.src, 'blob:newly-cached'); assert.equal(player.status, 'playing'); assert.equal(player.track.name, 'a');
+  player.pause();
 });
