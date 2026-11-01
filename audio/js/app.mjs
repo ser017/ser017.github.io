@@ -206,7 +206,7 @@ function renderFeedback() {
   else if (player.status === 'interrupted') setStatus(player.pauseRecoveryTimer !== null ? 'Воспроизведение прервано. Продолжаю…' : 'Воспроизведение приостановлено. Нажмите ▶, чтобы продолжить.', () => player.play());
   else if (player.status === 'error') setStatus(player.error, () => player.retry());
   else if (player.status === 'blocked') setStatus(player.error);
-  else if (player.status === 'loading') setStatus('Загрузка трека…');
+  else if (player.status === 'loading') setStatus(player.stream.preparing ? 'Подготовка фонового воспроизведения…' : 'Загрузка трека…');
   else if (player.status === 'ended') setStatus('Плейлист закончился.');
   else if (player.track && player.bufferState.total) setStatus(`Загружено вперёд: ${player.bufferState.ready} из ${player.bufferState.total}`);
   else setStatus('');

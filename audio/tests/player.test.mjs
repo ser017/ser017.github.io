@@ -467,15 +467,15 @@ class FakeMediaSource extends EventTarget {
   addSourceBuffer(type) { assert.equal(type,'audio/mpeg'); return this.sb; }
   endOfStream() { this.ends++; this.readyState = 'ended'; }
 }
-function continuousHarness(options = {}) {
+function continuousHarness(options = {}, playerOptions = {}) {
   const audio = new FakeAudio(), source = new FakeMediaSource(), revoked = [], all = new Map(tracks.map(t => [t.name,new Blob([new Uint8Array(4)],{type:'audio/mpeg'})]));
   audio.loads = 0; const load = audio.load.bind(audio); audio.load = () => { audio.loads++; load(); };
   const buffer = fakeBuffer();
   buffer.prepareQueue = () => {}; buffer.peekBlob = id => all.get(id); buffer.take = id => all.has(id) ? `blob:file-${id}` : null; buffer.suspend = () => {};
   const stream = new ContinuousAudio(audio,{enabled:true,createSource:()=>source,makeURL:()=> 'blob:one-stream',revokeURL:u=>revoked.push(u),durationOf:async b=>b.size,chunkBytes:10,...options});
-  const player = new AudioPlayer(audio,{buffer,continuous:stream,revokeURL:u=>revoked.push(u)});
+  const player = new AudioPlayer(audio,{buffer,continuous:stream,revokeURL:u=>revoked.push(u),...playerOptions});
   const start = async () => { player.start(tracks,'a'); source.open(); await settle(); };
-  return {audio,source,stream,player,start,revoked,all};
+  return {audio,source,stream,player,start,revoked,all,buffer};
 }
 
 test('continuous playback crosses song boundaries without changing src, load, or play', async () => {
@@ -577,4 +577,93 @@ test('a queue edit racing a stream boundary follows the revised queue instead of
   const h=continuousHarness();await h.start();h.player.queue.removeUpcoming(0);
   h.audio.currentTime=4.1;h.audio.dispatchEvent(new Event('timeupdate'));await settle();
   assert.equal(h.player.track.name,'c');assert.equal(h.player.queue.current.name,'c');h.player.pause();h.stream.stop();
+});
+
+function coldStreamHarness(playerOptions = {}) {
+  const jobs = [], initialBuffer = {
+    ready: null,
+    cancel() { this.ready = null; },
+    prepare(track) { return new Promise((resolve, reject) => jobs.push({track,resolve,reject})); },
+    take(id) { assert.equal(this.ready.id,id); const url=this.ready.url;this.ready=null;return url; }
+  };
+  const h=continuousHarness({}, {initialBuffer,...playerOptions});
+  const first=h.all.get('a');h.all.delete('a');
+  const finish=(index=0, ok=true) => {
+    const job=jobs[index];
+    initialBuffer.ready={id:job.track.name,url:`blob:initial-${job.track.name}`,blob:first};
+    job.resolve(ok);
+  };
+  return {...h,jobs,initialBuffer,finish};
+}
+
+test('an uncached first tap opens the continuous source immediately and supplies data without another play or load', async () => {
+  const h=coldStreamHarness();h.player.start(tracks,'a');
+  assert.equal(h.audio.src,'blob:one-stream');assert.equal(h.audio.playCalls,1);
+  assert.equal(h.stream.preparing,true);assert.equal(h.jobs[0].track.name,'a');
+  h.source.open();await settle();
+  assert.equal(h.source.ends,0);assert.equal(h.source.sb.end,0);assert(h.stream.active);
+  h.finish();await settle();
+  assert.equal(h.stream.preparing,false);assert.equal(h.audio.loads,1);assert.equal(h.audio.playCalls,1);
+  assert.equal(h.player.activeBlob,'blob:initial-a');assert(h.source.sb.end>4);
+  h.audio.currentTime=4.1;h.audio.dispatchEvent(new Event('timeupdate'));await settle();
+  assert.equal(h.player.track.name,'b');assert.equal(h.audio.loads,1);assert.equal(h.audio.playCalls,1);
+  assert(h.revoked.includes('blob:initial-a'));h.player.pause();h.stream.stop();
+});
+
+test('pausing while the initial file downloads keeps the player paused when the download completes', async () => {
+  const h=coldStreamHarness();h.player.start(tracks,'a');h.source.open();await settle();h.player.pause();
+  const calls=h.audio.playCalls;h.finish();await settle();
+  assert.equal(h.player.status,'paused');assert.equal(h.player.wantPlay,false);assert.equal(h.audio.paused,true);
+  assert.equal(h.audio.playCalls,calls);assert.equal(h.source.sb.end,0);assert(h.stream.active);
+  h.player.play();await settle();assert.equal(h.audio.loads,1);assert(h.source.sb.end>0);
+  h.player.pause();h.stream.stop();
+});
+
+test('resuming an empty prepared stream feeds bytes before the native playing event can occur', async () => {
+  const h=coldStreamHarness();
+  h.audio.play=()=>{h.audio.playCalls++;h.audio.paused=false;return Promise.resolve();};
+  h.player.start(tracks,'a');h.source.open();await settle();h.player.pause();h.finish();await settle();
+  assert.equal(h.source.sb.end,0);h.player.play();await settle();
+  assert(h.source.sb.end>0);assert.equal(h.audio.loads,1);h.player.pause();h.stream.stop();
+});
+
+test('late initial-file completion cannot replace a newer selected song', async () => {
+  const h=coldStreamHarness();h.player.start(tracks,'a');h.source.open();await settle();
+  h.player.next();await settle();const epoch=h.stream.epoch,loads=h.audio.loads;
+  h.finish();await settle();
+  assert.equal(h.player.track.name,'b');assert.equal(h.stream.current.track.name,'b');assert.equal(h.stream.epoch,epoch);
+  assert.equal(h.audio.loads,loads);assert.equal(h.player.activeBlob,'blob:file-b');
+  h.player.pause();h.stream.stop();
+});
+
+test('initial download failure falls back to the selected file instead of leaving a silent stream', async () => {
+  const h=coldStreamHarness();h.player.start(tracks,'a');h.source.open();await settle();
+  h.finish(0,false);await settle();
+  assert.equal(h.stream.active,false);assert.equal(h.player.track.name,'a');assert.equal(h.audio.src,tracks[0].url);
+  assert.equal(h.player.wantPlay,true);h.player.pause();
+});
+
+test('a failed initial download after manual pause does not resume the fallback file', async () => {
+  const h=coldStreamHarness();h.player.start(tracks,'a');h.source.open();await settle();h.player.pause();
+  const calls=h.audio.playCalls;h.jobs[0].reject(new Error('Offline'));await settle();
+  assert.equal(h.stream.active,false);assert.equal(h.audio.src,tracks[0].url);
+  assert.equal(h.audio.playCalls,calls);assert.equal(h.player.status,'paused');assert.equal(h.player.wantPlay,false);
+});
+
+test('a stalled first-file download times out and its late completion cannot revive the abandoned stream', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  const h=coldStreamHarness({startupTimeoutMs:100});
+  h.audio.play=()=>{h.audio.playCalls++;h.audio.paused=false;return Promise.resolve();};
+  h.player.start(tracks,'a');h.source.open();await settle();
+  t.mock.timers.tick(100);await settle();
+  assert.equal(h.stream.active,false);assert.equal(h.audio.src,tracks[0].url);const calls=h.audio.playCalls;
+  h.finish();await settle();assert.equal(h.audio.src,tracks[0].url);assert.equal(h.audio.playCalls,calls);
+  h.player.pause();
+});
+
+test('reserve notifications during first-file preparation do not replace the active MediaSource', async () => {
+  const h=coldStreamHarness();h.player.start(tracks,'a');h.source.open();await settle();
+  h.player.status='loading';h.buffer.take=()=> 'blob:stale-reserve';h.buffer.onChange();await settle();
+  assert(h.stream.active);assert.equal(h.audio.loads,1);assert.equal(h.audio.src,'blob:one-stream');
+  h.player.pause();h.stream.stop();
 });

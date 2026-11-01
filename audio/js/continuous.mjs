@@ -36,16 +36,17 @@ export class ContinuousAudio {
     audio.addEventListener('playing', () => this.pump());
   }
   get current() { return this.segments[0] || null; }
+  get preparing() { return this.active && !this.current?.blob; }
   get position() { return Math.max(0, Math.min(this.audio.currentTime - (this.current?.start || 0), this.duration || Infinity)); }
   get duration() { return this.current?.duration || 0; }
   get bufferedEnd() { const ranges = this.sb?.buffered; return ranges?.length ? ranges.end(ranges.length - 1) : 0; }
-  get state() { return { active: this.active, bufferedAhead: Math.max(0, this.bufferedEnd - this.audio.currentTime), segments: this.segments.length }; }
+  get state() { return { active: this.active, preparing: this.preparing, bufferedAhead: Math.max(0, this.bufferedEnd - this.audio.currentTime), segments: this.segments.length }; }
   metadata(blob) {
     if (!this.durations.has(blob)) this.durations.set(blob, Promise.resolve().then(() => this.durationOf(blob)));
     return this.durations.get(blob);
   }
   start(track, blob, upcoming = [], repeat = false) {
-    if (!this.enabled || !blob) return false;
+    if (!this.enabled) return false;
     this.stop();
     const epoch = this.epoch, source = this.createSource();
     this.source = source; this.active = true; this.sb = null; this.busy = false;
@@ -61,8 +62,14 @@ export class ContinuousAudio {
       } catch (error) { this.fail(error); }
     });
     this.audio.src = this.url; this.audio.loop = false; this.audio.load();
-    this.report('stream-start', { track: track.name });
+    this.report('stream-start', { track: track.name, preparing: !blob });
     return true;
+  }
+  provide(track, blob) {
+    if (!this.preparing || this.current.track.name !== track.name || !blob?.size) return false;
+    this.current.blob = blob;
+    this.report('stream-first-ready', { track: track.name, bytes: blob.size });
+    this.pump(); return true;
   }
   stop() {
     this.epoch++; this.active = false;
@@ -143,6 +150,7 @@ export class ContinuousAudio {
         while (this.active && epoch === this.epoch && !this.audio.paused) {
           if (this.reconciled !== this.revision && !await this.reconcile(epoch)) return;
           const segment = this.segments.at(-1);
+          if (!segment.blob) return;
           if (segment.complete) {
             const track = this.repeat ? this.current.track : this.upcoming[this.segments.length - 1];
             if (!track) {

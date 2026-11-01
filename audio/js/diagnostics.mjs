@@ -1,6 +1,6 @@
 const key = 'ser017-audio-diagnostics-v1';
 const limit = 240;
-export const playbackVersion = '2026-10-31-stream-5';
+export const playbackVersion = '2026-11-01-startup-6';
 const session = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 let events = [];
 try {

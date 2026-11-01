@@ -1,11 +1,11 @@
 import { recordAudioEvent, errorDetails } from './diagnostics.mjs';
 import { TrackQueue } from './queue.mjs';
 import { PlaybackBuffer } from './reserve.mjs';
-import { directURL } from './prefetch.mjs';
+import { directURL, NextTrackBuffer } from './prefetch.mjs';
 import { ContinuousAudio } from './continuous.mjs';
 
 export class AudioPlayer extends EventTarget {
-  constructor(audio, { queue = new TrackQueue(), buffer = new PlaybackBuffer(), continuous = null, revokeURL = url => URL.revokeObjectURL(url), retryDelays = [1000, 3000, 7000, 15000, 30000, 60000, 60000, 60000], startupTimeoutMs = 25000, stalledTimeoutMs = 20000, pauseRecoveryDelays = [300, 1500], isHidden = () => globalThis.document?.hidden === true, report = recordAudioEvent } = {}) {
+  constructor(audio, { queue = new TrackQueue(), buffer = new PlaybackBuffer(), continuous = null, initialBuffer = null, revokeURL = url => URL.revokeObjectURL(url), retryDelays = [1000, 3000, 7000, 15000, 30000, 60000, 60000, 60000], startupTimeoutMs = 25000, stalledTimeoutMs = 20000, pauseRecoveryDelays = [300, 1500], isHidden = () => globalThis.document?.hidden === true, report = recordAudioEvent } = {}) {
     super();
     Object.assign(this, { audio, queue, buffer, revokeURL, retryDelays, startupTimeoutMs, stalledTimeoutMs, pauseRecoveryDelays, isHidden, report });
     this.track = null; this.status = 'idle'; this.wantPlay = false; this.repeat = false;
@@ -14,13 +14,14 @@ export class AudioPlayer extends EventTarget {
     this.retryTimer = null; this.retryCount = 0; this.resumeAt = 0; this.watchdog = null;
     this.pauseRecoveryTimer = null; this.pauseRecoveryCount = 0; this.pauseRecoveryProgress = 0;
     this.stream = continuous || new ContinuousAudio(audio, { report });
+    this.initialBuffer = initialBuffer || new NextTrackBuffer({ cache: buffer.cache, report });
     this.stream.getBlob = track => this.buffer.peekBlob?.(track.name);
     this.stream.onAdvance = segment => this.advanceStream(segment);
     this.stream.onError = error => this.sourceFailed(error);
     this.buffer.onChange = () => {
       this.dispatchEvent(new Event('buffer'));
       this.stream.pump();
-      if (this.track && this.wantPlay && ['loading', 'recovering'].includes(this.status)) {
+      if (!this.stream.active && this.track && this.wantPlay && ['loading', 'recovering'].includes(this.status)) {
         const prepared = this.buffer.take(this.track.name);
         if (prepared) this.usePrepared(prepared);
       }
@@ -151,7 +152,7 @@ export class AudioPlayer extends EventTarget {
     this.retryCount = 0; this.resumeAt = 0; this.lastProgress = null;
     const blob = this.buffer.peekBlob?.(track.name);
     const prepared = this.buffer.take(track.name);
-    this.stream.stop();
+    this.initialBuffer.cancel(); this.stream.stop();
     if (!this.buffer.prepareQueue) this.buffer.cancel(); this.prefetchFor = null;
     const previousBlob = this.activeBlob;
     this.activeBlob = prepared;
@@ -160,13 +161,30 @@ export class AudioPlayer extends EventTarget {
     this.candidates = [...new Set([prepared, directURL(track.url), track.url].filter(Boolean))];
     this.sourceIndex = 0;
     let streaming = false;
-    try { streaming = Boolean(blob && this.stream.start(track, blob, this.queue.upcoming, this.repeat)); }
+    // Attach the continuous source and issue play() in the user's first tap,
+    // rather than creating a new media session at a later, hidden boundary.
+    try { streaming = this.stream.start(track, blob, this.queue.upcoming, this.repeat); }
     catch (error) { this.stream.stop(); this.stream.enabled = false; this.log('stream-start-failed', errorDetails(error)); }
     if (!streaming) { this.audio.src = this.candidates[0]; this.audio.loop = this.repeat; this.audio.load(); }
     if (previousBlob && previousBlob !== prepared) this.revokeURL(previousBlob);
     this.log('select', { buffered: Boolean(prepared) }); this.notify();
     if (autoplay) this.play();
-    if (!prepared) this.restoreCurrent();
+    if (streaming && !blob) this.prepareInitial(track);
+    else if (!streaming && !prepared) this.restoreCurrent();
+  }
+  prepareInitial(track) {
+    if (!this.stream.preparing) return;
+    const epoch = this.stream.epoch;
+    const current = () => this.stream.active && epoch === this.stream.epoch && this.track?.name === track.name;
+    void this.initialBuffer.prepare(track).then(ready => {
+      if (!current()) return;
+      const blob = this.initialBuffer.ready?.blob;
+      if (!ready || !blob) { this.sourceFailed(new Error('Cannot prepare the first stream file')); return; }
+      const previousBlob = this.activeBlob;
+      this.activeBlob = this.initialBuffer.take(track.name);
+      this.stream.provide(track, blob); this.notify();
+      if (previousBlob && previousBlob !== this.activeBlob) this.revokeURL(previousBlob);
+    }).catch(error => { if (current()) this.sourceFailed(error); });
   }
   usePrepared(url) {
     this.clearRetry(); this.clearPauseRecovery();
@@ -210,7 +228,7 @@ export class AudioPlayer extends EventTarget {
         this.log('play-blocked', errorDetails(error)); this.notify();
       } else this.sourceFailed(error);
     };
-    try { Promise.resolve(this.audio.play()).catch(failed); }
+    try { Promise.resolve(this.audio.play()).catch(failed); this.stream.pump(); }
     catch (error) { failed(error); }
   }
   pause(origin = 'page') {
@@ -302,7 +320,7 @@ export class AudioPlayer extends EventTarget {
     this.log('load-source'); this.notify(); if (this.wantPlay) this.play();
   }
   leaveStream(position) {
-    this.stream.stop(); this.resumeAt = position;
+    this.initialBuffer.cancel(); this.stream.stop(); this.resumeAt = position;
     this.candidates = [...new Set([this.activeBlob, directURL(this.track.url), this.track.url].filter(Boolean))];
     this.audio.loop = this.repeat; this.log('stream-fallback'); this.loadCandidate(0);
   }
