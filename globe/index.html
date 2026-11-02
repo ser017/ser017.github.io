@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<link rel="icon" type="image/png" sizes="64x64" href="/blog/assets/images/favicon.png?v=1">
+  <meta charset="utf-8" >
+  <meta name="viewport" content="width=device-width,initial-scale=1" >
+  <title>Globe</title>
+  <script src="/blog/assets/js/theme.js"></script>
+  <link rel="stylesheet" href="/blog/assets/css/main.css">
+
+</head>
+
+
+<script defer src="/blog/assets/js/zoom.js"></script>
+<script defer src="/blog/assets/js/video.js"></script>
+
+
+
+
+<body class="globe-view">
+  <div class="container">
+    <header class="header">
+      <div class="site-title"><a href="/blog/" style="color:inherit;text-decoration:none">блог</a></div>
+      <nav class="nav">
+        <button class="theme-toggle" type="button" role="switch" data-theme-toggle aria-label="Тёмная тема" aria-checked="false" hidden>
+          <span class="theme-toggle__icons" aria-hidden="true"><svg class="theme-icon theme-icon--sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg><svg class="theme-icon theme-icon--moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 13.2A9 9 0 0 1 10.8 3.2a9 9 0 1 0 10 10Z"></path></svg></span>
+          <span class="theme-toggle__thumb" aria-hidden="true"><svg class="theme-icon theme-icon--sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg><svg class="theme-icon theme-icon--moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 13.2A9 9 0 0 1 10.8 3.2a9 9 0 1 0 10 10Z"></path></svg></span>
+        </button>
+        <a class="site-about" href="/me/">About</a> &nbsp; · &nbsp;
+        <a class="site-about" href="/globe/">Globe</a>
+
+      </nav>
+    </header>
+
+    <link rel="stylesheet" href="/blog/assets/css/globe.css">
+<section class="travel-page">
+  <nav class="travel-tabs" aria-label="Путешествия"><a href="/blog/tags/">Все теги</a><a href="/globe/" aria-current="page">Globe</a></nav>
+  <h1>Мои путешествия</h1>
+  <p class="travel-intro">Вращайте глобус, приближайте карту и выбирайте любую страну. Красным отмечены места, где я побывал с обзорными статьями на них.</p>
+  <div class="travel-layout">
+    <div class="travel-map">
+      <div class="globe-stage">
+        <svg id="travel-globe" viewBox="0 0 720 640" role="img" aria-label="Вращаемый глобус. Выбрать страну также можно кнопками внизу экрана." tabindex="0"></svg>
+        <div class="globe-controls" aria-label="Управление глобусом"><button type="button" data-globe-zoom="1.3" aria-label="Приблизить">+</button><button type="button" data-globe-zoom="0.77" aria-label="Отдалить">−</button><button type="button" id="globe-reset">Сбросить</button></div>
+      </div>
+      <p class="globe-help" id="globe-status" role="status">Загрузка глобуса…</p>
+      <div class="travel-places" aria-label="Выбрать место">
+        
+        <button type="button" class="place-button" data-place="cn" data-id="156" data-lon="104" data-lat="35" data-small="false" aria-pressed="false">Китай <span>2</span></button>
+        
+        <button type="button" class="place-button" data-place="hk" data-id="344" data-lon="114.17" data-lat="22.32" data-small="true" aria-pressed="false">Гонконг <span>2</span></button>
+        
+        <button type="button" class="place-button" data-place="mo" data-id="446" data-lon="113.55" data-lat="22.2" data-small="true" aria-pressed="false">Макао <span>1</span></button>
+        
+        <button type="button" class="place-button" data-place="kz" data-id="398" data-lon="67" data-lat="48" data-small="false" aria-pressed="false">Казахстан <span>1</span></button>
+        
+        <button type="button" class="place-button" data-place="ge" data-id="268" data-lon="43.5" data-lat="42" data-small="false" aria-pressed="false">Грузия <span>1</span></button>
+        
+      </div>
+      <noscript><p>Для вращения глобуса включите JavaScript. Все статьи доступны по ссылкам ниже.</p></noscript>
+    </div>
+    <aside class="travel-stories" aria-label="Статьи о выбранном месте">
+      <button class="travel-close" type="button" aria-label="Закрыть статьи">×</button>
+      <div id="travel-empty"><span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Куда отправимся?</h2><p>Выберите место на глобусе или в списке — здесь появятся мои статьи.</p><span class="travel-red-dot"></span> Красным отмечены места, о которых я писал.</div>
+      <section id="travel-no-stories" hidden><span class="travel-eyebrow">СТРАНА НА КАРТЕ</span><h2 id="travel-country-name"></h2><p>Пока нет статей об этом месте.</p></section>
+      
+      <section class="place-stories" data-stories="cn">
+        <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Китай</h2>
+        <a class="travel-all" href="/blog/tags/cn/" target="_blank" rel="noopener noreferrer">Все статьи: Китай →</a>
+        <div class="travel-article-list">
+          
+          <a class="travel-article" href="/blog/China-2026/" target="_blank" rel="noopener noreferrer">
+            <img src="/blog/assets/optimized/a88431e3df0c67855feb-960.webp" alt loading="eager" fetchpriority="high" decoding="async" width="2560" height="1440" srcset="/blog/assets/optimized/a88431e3df0c67855feb-320.webp 320w, /blog/assets/optimized/a88431e3df0c67855feb-640.webp 640w, /blog/assets/optimized/a88431e3df0c67855feb-960.webp 960w, /blog/assets/optimized/a88431e3df0c67855feb-1440.webp 1440w" sizes="(max-width: 788px) calc(100vw - 48px), 740px">
+            <span><strong>Китай</strong><time datetime="2026-10-27">27 октября 2026 г.</time></span><span aria-hidden="true">↗</span>
+          </a>
+          
+          <a class="travel-article" href="/blog/howtochina/" target="_blank" rel="noopener noreferrer">
+            <img src="/blog/assets/optimized/eaf718010e754dbc86a4-390.webp" alt loading="lazy" decoding="async" width="390" height="258" srcset="/blog/assets/optimized/eaf718010e754dbc86a4-320.webp 320w, /blog/assets/optimized/eaf718010e754dbc86a4-390.webp 390w" sizes="(max-width: 788px) calc(100vw - 48px), 740px">
+            <span><strong>Чем платить и как ориентироваться в Китае</strong><time datetime="2026-10-17">17 октября 2026 г.</time></span><span aria-hidden="true">↗</span>
+          </a>
+          
+        </div>
+      </section>
+      
+      <section class="place-stories" data-stories="hk">
+        <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Гонконг</h2>
+        <a class="travel-all" href="/blog/tags/hk/" target="_blank" rel="noopener noreferrer">Все статьи: Гонконг →</a>
+        <div class="travel-article-list">
+          
+          <a class="travel-article" href="/blog/China-2026/" target="_blank" rel="noopener noreferrer">
+            <img src="/blog/assets/optimized/a88431e3df0c67855feb-960.webp" alt loading="lazy" decoding="async" width="2560" height="1440" srcset="/blog/assets/optimized/a88431e3df0c67855feb-320.webp 320w, /blog/assets/optimized/a88431e3df0c67855feb-640.webp 640w, /blog/assets/optimized/a88431e3df0c67855feb-960.webp 960w, /blog/assets/optimized/a88431e3df0c67855feb-1440.webp 1440w" sizes="(max-width: 788px) calc(100vw - 48px), 740px">
+            <span><strong>Китай</strong><time datetime="2026-10-27">27 октября 2026 г.</time></span><span aria-hidden="true">↗</span>
+          </a>
+          
+          <a class="travel-article" href="/blog/HongKong-2025/" target="_blank" rel="noopener noreferrer">
+            <img src="/blog/assets/optimized/f9c6f9acfa62b43790aa-960.webp" alt loading="lazy" decoding="async" width="4080" height="3072" srcset="/blog/assets/optimized/f9c6f9acfa62b43790aa-320.webp 320w, /blog/assets/optimized/f9c6f9acfa62b43790aa-640.webp 640w, /blog/assets/optimized/f9c6f9acfa62b43790aa-960.webp 960w, /blog/assets/optimized/f9c6f9acfa62b43790aa-1440.webp 1440w" sizes="(max-width: 788px) calc(100vw - 48px), 740px">
+            <span><strong>Гонконг</strong><time datetime="2026-01-29">29 января 2026 г.</time></span><span aria-hidden="true">↗</span>
+          </a>
+          
+        </div>
+      </section>
+      
+      <section class="place-stories" data-stories="mo">
+        <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Макао</h2>
+        <a class="travel-all" href="/blog/tags/mo/" target="_blank" rel="noopener noreferrer">Все статьи: Макао →</a>
+        <div class="travel-article-list">
+          
+          <a class="travel-article" href="/blog/China-2026/" target="_blank" rel="noopener noreferrer">
+            <img src="/blog/assets/optimized/a88431e3df0c67855feb-960.webp" alt loading="lazy" decoding="async" width="2560" height="1440" srcset="/blog/assets/optimized/a88431e3df0c67855feb-320.webp 320w, /blog/assets/optimized/a88431e3df0c67855feb-640.webp 640w, /blog/assets/optimized/a88431e3df0c67855feb-960.webp 960w, /blog/assets/optimized/a88431e3df0c67855feb-1440.webp 1440w" sizes="(max-width: 788px) calc(100vw - 48px), 740px">
+            <span><strong>Китай</strong><time datetime="2026-10-27">27 октября 2026 г.</time></span><span aria-hidden="true">↗</span>
+          </a>
+          
+        </div>
+      </section>
+      
+      <section class="place-stories" data-stories="kz">
+        <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Казахстан</h2>
+        <a class="travel-all" href="/blog/tags/kz/" target="_blank" rel="noopener noreferrer">Все статьи: Казахстан →</a>
+        <div class="travel-article-list">
+          
+          <a class="travel-article" href="/blog/Kostanay/" target="_blank" rel="noopener noreferrer">
+            <img src="/blog/assets/optimized/c5b1755a25756021c9cc-960.webp" alt loading="lazy" decoding="async" width="964" height="919" srcset="/blog/assets/optimized/c5b1755a25756021c9cc-320.webp 320w, /blog/assets/optimized/c5b1755a25756021c9cc-640.webp 640w, /blog/assets/optimized/c5b1755a25756021c9cc-960.webp 960w, /blog/assets/optimized/c5b1755a25756021c9cc-964.webp 964w" sizes="(max-width: 788px) calc(100vw - 48px), 740px">
+            <span><strong>Костанай</strong><time datetime="2025-11-04">4 ноября 2025 г.</time></span><span aria-hidden="true">↗</span>
+          </a>
+          
+        </div>
+      </section>
+      
+      <section class="place-stories" data-stories="ge">
+        <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Грузия</h2>
+        <a class="travel-all" href="/blog/tags/ge/" target="_blank" rel="noopener noreferrer">Все статьи: Грузия →</a>
+        <div class="travel-article-list">
+          
+          <a class="travel-article" href="/blog/Tbilisi-2025/" target="_blank" rel="noopener noreferrer">
+            <img src="/blog/assets/optimized/56cce21939281deb0d5c-960.webp" alt loading="lazy" decoding="async" width="1804" height="1158" srcset="/blog/assets/optimized/56cce21939281deb0d5c-320.webp 320w, /blog/assets/optimized/56cce21939281deb0d5c-640.webp 640w, /blog/assets/optimized/56cce21939281deb0d5c-960.webp 960w, /blog/assets/optimized/56cce21939281deb0d5c-1440.webp 1440w" sizes="(max-width: 788px) calc(100vw - 48px), 740px">
+            <span><strong>Тбилиси</strong><time datetime="2026-01-01">1 января 2026 г.</time></span><span aria-hidden="true">↗</span>
+          </a>
+          
+        </div>
+      </section>
+      
+    </aside>
+  </div>
+</section>
+<script type="application/json" id="globe-country-catalog">[{"tag":"cn","name":"Китай","id":"156","coordinates":[104,35]},{"tag":"hk","name":"Гонконг","id":"344","coordinates":[114.17,22.32],"small":true},{"tag":"mo","name":"Макао","id":"446","coordinates":[113.55,22.2],"small":true},{"tag":"kz","name":"Казахстан","id":"398","coordinates":[67,48]},{"tag":"ge","name":"Грузия","id":"268","coordinates":[43.5,42]},{"tag":"au","name":"Австралия","id":"036","coordinates":[134.30389,-25.7633]},{"tag":"at","name":"Австрия","id":"040","coordinates":[14.11483,47.5924]},{"tag":"az","name":"Азербайджан","id":"031","coordinates":[47.54365,40.28737]},{"tag":"ax","name":"Аландские о-ва","id":"248","coordinates":[20.05589,60.18627],"small":true},{"tag":"al","name":"Албания","id":"008","coordinates":[20.05592,41.13497]},{"tag":"dz","name":"Алжир","id":"012","coordinates":[2.66589,28.04443]},{"tag":"as","name":"Американское Самоа","id":"016","coordinates":[-170.39919,-14.25259],"small":true},{"tag":"ai","name":"Ангилья","id":"660","coordinates":[-63.0586,18.22521],"small":true},{"tag":"ao","name":"Ангола","id":"024","coordinates":[17.53135,-12.26955]},{"tag":"ad","name":"Андорра","id":"020","coordinates":[1.56107,42.5413],"small":true},{"tag":"aq","name":"Антарктида","id":"010","coordinates":[82.03873,-84.94206]},{"tag":"ag","name":"Антигуа и Барбуда","id":"028","coordinates":[-61.79128,17.28518],"small":true},{"tag":"ar","name":"Аргентина","id":"032","coordinates":[-64.76084,-34.68918]},{"tag":"am","name":"Армения","id":"051","coordinates":[44.94065,40.28588]},{"tag":"aw","name":"Аруба","id":"533","coordinates":[-69.97379,12.51718],"small":true},{"tag":"af","name":"Афганистан","id":"004","coordinates":[65.92946,33.8198]},{"tag":"bs","name":"Багамы","id":"044","coordinates":[-76.51069,24.21137],"small":true},{"tag":"bd","name":"Бангладеш","id":"050","coordinates":[90.25112,23.83887]},{"tag":"bb","name":"Барбадос","id":"052","coordinates":[-59.56165,13.18137],"small":true},{"tag":"bh","name":"Бахрейн","id":"048","coordinates":[50.54664,26.0525],"small":true},{"tag":"by","name":"Беларусь","id":"112","coordinates":[28.01639,53.52]},{"tag":"bz","name":"Белиз","id":"084","coordinates":[-88.69472,17.20622]},{"tag":"be","name":"Бельгия","id":"056","coordinates":[4.64739,50.63667]},{"tag":"bj","name":"Бенин","id":"204","coordinates":[2.3276,9.63509]},{"tag":"bm","name":"Бермудские о-ва","id":"060","coordinates":[-64.76229,32.31079],"small":true},{"tag":"bg","name":"Болгария","id":"100","coordinates":[25.21111,42.7708]},{"tag":"bo","name":"Боливия","id":"068","coordinates":[-64.69791,-16.68065]},{"tag":"ba","name":"Босния и Герцеговина","id":"070","coordinates":[17.7794,44.16862]},{"tag":"bw","name":"Ботсвана","id":"072","coordinates":[23.80906,-22.16697]},{"tag":"br","name":"Бразилия","id":"076","coordinates":[-53.21012,-10.63194]},{"tag":"io","name":"Британская территория в Индийском океане","id":"086","coordinates":[72.3021,-7.14201],"small":true},{"tag":"bn","name":"Бруней","id":"096","coordinates":[114.72669,4.51616],"small":true},{"tag":"bf","name":"Буркина-Фасо","id":"854","coordinates":[-1.76214,12.27075]},{"tag":"bi","name":"Бурунди","id":"108","coordinates":[29.87501,-3.35731]},{"tag":"bt","name":"Бутан","id":"064","coordinates":[90.40459,27.42277]},{"tag":"vu","name":"Вануату","id":"548","coordinates":[167.68925,-16.18974],"small":true},{"tag":"va","name":"Ватикан","id":"336","coordinates":[12.43432,41.90209],"small":true},{"tag":"gb","name":"Великобритания","id":"826","coordinates":[-2.77773,54.03366]},{"tag":"hu","name":"Венгрия","id":"348","coordinates":[19.38043,47.1664]},{"tag":"ve","name":"Венесуэла","id":"862","coordinates":[-66.15772,7.12585]},{"tag":"vg","name":"Виргинские о-ва (Великобритания)","id":"092","coordinates":[-64.50252,18.51111],"small":true},{"tag":"vi","name":"Виргинские о-ва (США)","id":"850","coordinates":[-64.79766,17.97922],"small":true},{"tag":"um","name":"Внешние малые о-ва (США)","id":"581","coordinates":[-158.56628,15.78448],"small":true},{"tag":"tl","name":"Восточный Тимор","id":"626","coordinates":[125.85124,-8.82438],"small":true},{"tag":"vn","name":"Вьетнам","id":"704","coordinates":[106.34793,16.54046]},{"tag":"ga","name":"Габон","id":"266","coordinates":[11.78956,-0.59136]},{"tag":"ht","name":"Гаити","id":"332","coordinates":[-72.69242,18.93788]},{"tag":"gy","name":"Гайана","id":"328","coordinates":[-58.97805,4.7895]},{"tag":"gm","name":"Гамбия","id":"270","coordinates":[-15.39747,13.45121],"small":true},{"tag":"gh","name":"Гана","id":"288","coordinates":[-1.21667,7.94816]},{"tag":"gt","name":"Гватемала","id":"320","coordinates":[-90.36284,15.69211]},{"tag":"gn","name":"Гвинея","id":"324","coordinates":[-10.93664,10.43572]},{"tag":"gw","name":"Гвинея-Бисау","id":"624","coordinates":[-14.97761,12.02719]},{"tag":"de","name":"Германия","id":"276","coordinates":[10.36074,51.05012]},{"tag":"gg","name":"Гернси","id":"831","coordinates":[-2.52979,49.48454],"small":true},{"tag":"gi","name":"Гибралтар","id":"292","coordinates":[-5.34708,36.1297],"small":true},{"tag":"hn","name":"Гондурас","id":"340","coordinates":[-86.62788,14.82312]},{"tag":"gd","name":"Гренада","id":"308","coordinates":[-61.65598,12.15374],"small":true},{"tag":"gl","name":"Гренландия","id":"304","coordinates":[-41.77721,73.12697]},{"tag":"gr","name":"Греция","id":"300","coordinates":[22.98454,39.02453]},{"tag":"gu","name":"Гуам","id":"316","coordinates":[144.77246,13.44449],"small":true},{"tag":"dk","name":"Дания","id":"208","coordinates":[10.06578,55.95916]},{"tag":"je","name":"Джерси","id":"832","coordinates":[-2.12702,49.22105],"small":true},{"tag":"dj","name":"Джибути","id":"262","coordinates":[42.56585,11.74964]},{"tag":"dm","name":"Доминика","id":"212","coordinates":[-61.35686,15.43664],"small":true},{"tag":"do","name":"Доминиканская Республика","id":"214","coordinates":[-70.49619,18.89727]},{"tag":"eg","name":"Египет","id":"818","coordinates":[29.87806,26.45687]},{"tag":"zm","name":"Замбия","id":"894","coordinates":[27.80781,-13.45753]},{"tag":"eh","name":"Западная Сахара","id":"732","coordinates":[-12.2669,24.21471]},{"tag":"zw","name":"Зимбабве","id":"716","coordinates":[29.85145,-18.99537]},{"tag":"il","name":"Израиль","id":"376","coordinates":[34.99191,31.43467]},{"tag":"in","name":"Индия","id":"356","coordinates":[79.56754,22.77867]},{"tag":"id","name":"Индонезия","id":"360","coordinates":[117.21013,-2.272]},{"tag":"jo","name":"Иордания","id":"400","coordinates":[36.75706,31.23832]},{"tag":"iq","name":"Ирак","id":"368","coordinates":[43.77517,33.00972]},{"tag":"ir","name":"Иран","id":"364","coordinates":[54.44385,32.52264]},{"tag":"ie","name":"Ирландия","id":"372","coordinates":[-8.15263,53.16523]},{"tag":"is","name":"Исландия","id":"352","coordinates":[-18.60174,65.00046]},{"tag":"es","name":"Испания","id":"724","coordinates":[-3.71042,40.19015]},{"tag":"it","name":"Италия","id":"380","coordinates":[12.20283,42.70546]},{"tag":"ye","name":"Йемен","id":"887","coordinates":[47.57178,15.91342]},{"tag":"cv","name":"Кабо-Верде","id":"132","coordinates":[-23.96453,15.93439],"small":true},{"tag":"kh","name":"Камбоджа","id":"116","coordinates":[104.90105,12.71502]},{"tag":"cm","name":"Камерун","id":"120","coordinates":[12.73121,5.68315]},{"tag":"ca","name":"Канада","id":"124","coordinates":[-96.53662,60.4272]},{"tag":"qa","name":"Катар","id":"634","coordinates":[51.18664,25.31171],"small":true},{"tag":"ke","name":"Кения","id":"404","coordinates":[37.82296,0.55058]},{"tag":"cy","name":"Кипр","id":"196","coordinates":[32.98974,34.91563],"small":true},{"tag":"kg","name":"Киргизия","id":"417","coordinates":[74.50918,41.47397]},{"tag":"ki","name":"Кирибати","id":"296","coordinates":[-166.99247,0.63363],"small":true},{"tag":"kp","name":"КНДР","id":"408","coordinates":[127.15041,40.13717]},{"tag":"co","name":"Колумбия","id":"170","coordinates":[-73.07972,3.89909]},{"tag":"km","name":"Коморы","id":"174","coordinates":[43.6785,-11.8833],"small":true},{"tag":"cg","name":"Конго - Браззавиль","id":"178","coordinates":[15.21985,-0.83799]},{"tag":"cd","name":"Конго - Киншаса","id":"180","coordinates":[23.63887,-2.86784]},{"tag":"cr","name":"Коста-Рика","id":"188","coordinates":[-84.19145,9.97322]},{"tag":"ci","name":"Кот-д’Ивуар","id":"384","coordinates":[-5.56889,7.62548]},{"tag":"cu","name":"Куба","id":"192","coordinates":[-79.00632,21.64023]},{"tag":"kw","name":"Кувейт","id":"414","coordinates":[47.59518,29.33899],"small":true},{"tag":"cw","name":"Кюрасао","id":"531","coordinates":[-68.9716,12.19386],"small":true},{"tag":"la","name":"Лаос","id":"418","coordinates":[103.77513,18.48746]},{"tag":"lv","name":"Латвия","id":"428","coordinates":[24.91678,56.86049]},{"tag":"ls","name":"Лесото","id":"426","coordinates":[28.2304,-29.57868]},{"tag":"lr","name":"Либерия","id":"430","coordinates":[-9.31758,6.45144]},{"tag":"lb","name":"Ливан","id":"422","coordinates":[35.87762,33.91905],"small":true},{"tag":"ly","name":"Ливия","id":"434","coordinates":[18.06816,27.01579]},{"tag":"lt","name":"Литва","id":"440","coordinates":[23.89825,55.3246]},{"tag":"li","name":"Лихтенштейн","id":"438","coordinates":[9.54147,47.13791],"small":true},{"tag":"lu","name":"Люксембург","id":"442","coordinates":[6.07226,49.76648],"small":true},{"tag":"mu","name":"Маврикий","id":"480","coordinates":[57.85345,-20.18178],"small":true},{"tag":"mr","name":"Мавритания","id":"478","coordinates":[-10.36546,20.2195]},{"tag":"mg","name":"Мадагаскар","id":"450","coordinates":[46.74414,-19.31742]},{"tag":"mw","name":"Малави","id":"454","coordinates":[34.28341,-13.20359]},{"tag":"my","name":"Малайзия","id":"458","coordinates":[109.70002,3.81367]},{"tag":"ml","name":"Мали","id":"466","coordinates":[-3.58697,17.31349]},{"tag":"mv","name":"Мальдивы","id":"462","coordinates":[73.30741,3.79469],"small":true},{"tag":"mt","name":"Мальта","id":"470","coordinates":[14.40395,35.92101],"small":true},{"tag":"ma","name":"Марокко","id":"504","coordinates":[-8.66376,29.77303]},{"tag":"mh","name":"Маршалловы о-ва","id":"584","coordinates":[170.11467,7.13665],"small":true},{"tag":"mx","name":"Мексика","id":"484","coordinates":[-102.17836,23.92572]},{"tag":"mz","name":"Мозамбик","id":"508","coordinates":[35.60719,-17.19212]},{"tag":"md","name":"Молдова","id":"498","coordinates":[28.47013,47.18734]},{"tag":"mc","name":"Монако","id":"492","coordinates":[7.3984,43.73993],"small":true},{"tag":"mn","name":"Монголия","id":"496","coordinates":[103.12697,46.95517]},{"tag":"ms","name":"Монтсеррат","id":"500","coordinates":[-62.18703,16.7378],"small":true},{"tag":"mm","name":"Мьянма (Бирма)","id":"104","coordinates":[96.49566,21.09428]},{"tag":"na","name":"Намибия","id":"516","coordinates":[17.19654,-22.06833]},{"tag":"nr","name":"Науру","id":"520","coordinates":[166.93307,-0.52071],"small":true},{"tag":"np","name":"Непал","id":"524","coordinates":[83.9474,28.25696]},{"tag":"ne","name":"Нигер","id":"562","coordinates":[9.33223,17.41134]},{"tag":"ng","name":"Нигерия","id":"566","coordinates":[8.08133,9.59219]},{"tag":"nl","name":"Нидерланды","id":"528","coordinates":[4.8761,52.22085]},{"tag":"ni","name":"Никарагуа","id":"558","coordinates":[-85.03467,12.84305]},{"tag":"nu","name":"Ниуэ","id":"570","coordinates":[-169.86915,-19.04903],"small":true},{"tag":"nz","name":"Новая Зеландия","id":"554","coordinates":[172.90675,-41.71885]},{"tag":"nc","name":"Новая Каледония","id":"540","coordinates":[165.69845,-21.30539],"small":true},{"tag":"no","name":"Норвегия","id":"578","coordinates":[12.80074,66.38999]},{"tag":"im","name":"о-в Мэн","id":"833","coordinates":[-4.53392,54.22916],"small":true},{"tag":"nf","name":"о-в Норфолк","id":"574","coordinates":[167.95508,-29.03467],"small":true},{"tag":"sh","name":"о-в Св. Елены","id":"654","coordinates":[-10.02184,-23.55897],"small":true},{"tag":"ky","name":"о-ва Кайман","id":"136","coordinates":[-80.88038,19.42662],"small":true},{"tag":"ck","name":"о-ва Кука","id":"184","coordinates":[-158.79678,-19.7879],"small":true},{"tag":"pn","name":"о-ва Питкэрн","id":"612","coordinates":[-128.48222,-24.41168],"small":true},{"tag":"hm","name":"о-ва Херд и Макдональд","id":"334","coordinates":[73.50492,-53.08884],"small":true},{"tag":"ae","name":"ОАЭ","id":"784","coordinates":[54.29356,23.90579]},{"tag":"om","name":"Оман","id":"512","coordinates":[56.06321,20.58248]},{"tag":"pk","name":"Пакистан","id":"586","coordinates":[69.17014,29.88263]},{"tag":"pw","name":"Палау","id":"585","coordinates":[134.34377,7.19413],"small":true},{"tag":"ps","name":"Палестинские территории","id":"275","coordinates":[35.19692,31.91486],"small":true},{"tag":"pa","name":"Панама","id":"591","coordinates":[-80.12097,8.51731]},{"tag":"pg","name":"Папуа — Новая Гвинея","id":"598","coordinates":[145.22422,-6.47456]},{"tag":"py","name":"Парагвай","id":"600","coordinates":[-58.44166,-23.20817]},{"tag":"pe","name":"Перу","id":"604","coordinates":[-74.41642,-9.10875]},{"tag":"pl","name":"Польша","id":"616","coordinates":[19.42363,52.109]},{"tag":"pt","name":"Португалия","id":"620","coordinates":[-8.62043,39.60445]},{"tag":"pr","name":"Пуэрто-Рико","id":"630","coordinates":[-66.46744,18.22434],"small":true},{"tag":"kr","name":"Республика Корея","id":"410","coordinates":[127.81457,36.36102]},{"tag":"ru","name":"Россия","id":"643","coordinates":[95.65297,66.03568]},{"tag":"rw","name":"Руанда","id":"646","coordinates":[29.91919,-1.99272]},{"tag":"ro","name":"Румыния","id":"642","coordinates":[24.98308,45.8494]},{"tag":"sv","name":"Сальвадор","id":"222","coordinates":[-88.87045,13.73637]},{"tag":"ws","name":"Самоа","id":"882","coordinates":[-172.16196,-13.75465],"small":true},{"tag":"sm","name":"Сан-Марино","id":"674","coordinates":[12.44293,43.93659],"small":true},{"tag":"st","name":"Сан-Томе и Принсипи","id":"678","coordinates":[6.72741,0.44649],"small":true},{"tag":"sa","name":"Саудовская Аравия","id":"682","coordinates":[44.66307,24.08639]},{"tag":"mk","name":"Северная Македония","id":"807","coordinates":[21.68224,41.59486]},{"tag":"mp","name":"Северные Марианские о-ва","id":"580","coordinates":[145.60014,16.2314],"small":true},{"tag":"sc","name":"Сейшельские о-ва","id":"690","coordinates":[52.1164,-6.49545],"small":true},{"tag":"bl","name":"Сен-Бартелеми","id":"652","coordinates":[-62.83213,17.90528],"small":true},{"tag":"mf","name":"Сен-Мартен","id":"663","coordinates":[-63.05428,18.0777],"small":true},{"tag":"pm","name":"Сен-Пьер и Микелон","id":"666","coordinates":[-56.30752,46.93013],"small":true},{"tag":"sn","name":"Сенегал","id":"686","coordinates":[-14.46743,14.36622]},{"tag":"vc","name":"Сент-Винсент и Гренадины","id":"670","coordinates":[-61.20304,13.21642],"small":true},{"tag":"kn","name":"Сент-Китс и Невис","id":"659","coordinates":[-62.69904,17.27113],"small":true},{"tag":"lc","name":"Сент-Люсия","id":"662","coordinates":[-60.97018,13.9029],"small":true},{"tag":"rs","name":"Сербия","id":"688","coordinates":[20.80752,44.21111]},{"tag":"sg","name":"Сингапур","id":"702","coordinates":[103.81314,1.35881],"small":true},{"tag":"sx","name":"Синт-Мартен","id":"534","coordinates":[-63.06943,18.04063],"small":true},{"tag":"sy","name":"Сирия","id":"760","coordinates":[38.48427,35.0164]},{"tag":"sk","name":"Словакия","id":"703","coordinates":[19.47041,48.71078]},{"tag":"si","name":"Словения","id":"705","coordinates":[14.80399,46.11621],"small":true},{"tag":"us","name":"Соединенные Штаты","id":"840","coordinates":[-103.65228,44.75788]},{"tag":"sb","name":"Соломоновы о-ва","id":"090","coordinates":[159.62688,-8.91135]},{"tag":"so","name":"Сомали","id":"706","coordinates":[45.67842,4.73744]},{"tag":"sd","name":"Судан","id":"729","coordinates":[29.90668,15.96454]},{"tag":"sr","name":"Суринам","id":"740","coordinates":[-55.91116,4.13045]},{"tag":"sl","name":"Сьерра-Леоне","id":"694","coordinates":[-11.79499,8.56227]},{"tag":"tj","name":"Таджикистан","id":"762","coordinates":[71.02909,38.53597]},{"tag":"th","name":"Таиланд","id":"764","coordinates":[101.00108,15.07907]},{"tag":"tw","name":"Тайвань","id":"158","coordinates":[120.94705,23.74886]},{"tag":"tz","name":"Танзания","id":"834","coordinates":[34.80231,-6.26769]},{"tag":"tc","name":"Тёркс и Кайкос","id":"796","coordinates":[-71.87453,21.78053],"small":true},{"tag":"tg","name":"Того","id":"768","coordinates":[0.96386,8.52249]},{"tag":"to","name":"Тонга","id":"776","coordinates":[-174.8674,-20.05293],"small":true},{"tag":"tt","name":"Тринидад и Тобаго","id":"780","coordinates":[-61.25874,10.46875],"small":true},{"tag":"tv","name":"Тувалу","id":"798","coordinates":[178.52827,-7.76874],"small":true},{"tag":"tn","name":"Тунис","id":"788","coordinates":[9.55779,34.08876]},{"tag":"tm","name":"Туркменистан","id":"795","coordinates":[59.45154,39.12582]},{"tag":"tr","name":"Турция","id":"792","coordinates":[35.17135,39.13649]},{"tag":"ug","name":"Уганда","id":"800","coordinates":[32.36661,1.27515]},{"tag":"uz","name":"Узбекистан","id":"860","coordinates":[63.30299,41.77601]},{"tag":"ua","name":"Украина","id":"804","coordinates":[31.31796,49.19694]},{"tag":"wf","name":"Уоллис и Футуна","id":"876","coordinates":[-177.06005,-13.74224],"small":true},{"tag":"uy","name":"Уругвай","id":"858","coordinates":[-56.02425,-32.79004]},{"tag":"fo","name":"Фарерские о-ва","id":"234","coordinates":[-6.86994,62.072],"small":true},{"tag":"fm","name":"Федеративные Штаты Микронезии","id":"583","coordinates":[155.34943,7.02642],"small":true},{"tag":"fj","name":"Фиджи","id":"242","coordinates":[178.52633,-17.44641],"small":true},{"tag":"ph","name":"Филиппины","id":"608","coordinates":[122.90949,11.71699]},{"tag":"fi","name":"Финляндия","id":"246","coordinates":[26.19107,64.25169]},{"tag":"fk","name":"Фолклендские о-ва","id":"238","coordinates":[-59.37377,-51.73507],"small":true},{"tag":"fr","name":"Франция","id":"250","coordinates":[-6.6611,42.96384]},{"tag":"pf","name":"Французская Полинезия","id":"258","coordinates":[-144.95137,-15.16462],"small":true},{"tag":"tf","name":"Французские Южные территории","id":"260","coordinates":[68.90822,-49.07956],"small":true},{"tag":"hr","name":"Хорватия","id":"191","coordinates":[16.39548,45.06287]},{"tag":"cf","name":"Центрально-Африканская Республика","id":"140","coordinates":[20.45831,6.57038]},{"tag":"td","name":"Чад","id":"148","coordinates":[18.63636,15.27497]},{"tag":"me","name":"Черногория","id":"499","coordinates":[19.23832,42.7849],"small":true},{"tag":"cz","name":"Чехия","id":"203","coordinates":[15.32114,49.73703]},{"tag":"cl","name":"Чили","id":"152","coordinates":[-71.04521,-36.0803]},{"tag":"ch","name":"Швейцария","id":"756","coordinates":[8.21293,46.79998]},{"tag":"se","name":"Швеция","id":"752","coordinates":[16.27722,62.38131]},{"tag":"lk","name":"Шри-Ланка","id":"144","coordinates":[80.70369,7.6142]},{"tag":"ec","name":"Эквадор","id":"218","coordinates":[-78.76949,-1.42639]},{"tag":"gq","name":"Экваториальная Гвинея","id":"226","coordinates":[10.33321,1.70674]},{"tag":"er","name":"Эритрея","id":"232","coordinates":[38.8642,15.35668]},{"tag":"sz","name":"Эсватини","id":"748","coordinates":[31.47992,-26.56076],"small":true},{"tag":"ee","name":"Эстония","id":"233","coordinates":[25.53837,58.67191]},{"tag":"et","name":"Эфиопия","id":"231","coordinates":[39.60936,8.61461]},{"tag":"gs","name":"Южная Георгия и Южные Сандвичевы о-ва","id":"239","coordinates":[-36.03095,-54.67365],"small":true},{"tag":"za","name":"Южно-Африканская Республика","id":"710","coordinates":[25.19629,-28.97449]},{"tag":"ss","name":"Южный Судан","id":"728","coordinates":[30.305,7.28363]},{"tag":"jm","name":"Ямайка","id":"388","coordinates":[-77.31885,18.15587],"small":true},{"tag":"jp","name":"Япония","id":"392","coordinates":[137.60534,37.42012]}]</script>
+<script defer src="/blog/assets/vendor/d3.min.js"></script>
+<script defer src="/blog/assets/vendor/topojson-client.min.js"></script>
+<script defer src="/blog/assets/js/globe-renderer.js"></script>
+<script defer src="/blog/assets/js/globe.js"></script>
+
+
+
+    <footer style="margin-top:40px;color:var(--muted);font-size:13px">
+      ser017 © 2026
+    </footer>
+
+  </div>
+</body>
+</html>
