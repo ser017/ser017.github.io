@@ -11,9 +11,14 @@ permalink: /globe/index.html
   <p class="travel-intro">Вращайте глобус, приближайте карту и выбирайте любую страну. Красным отмечены места, где я побывал с обзорными статьями на них.</p>
   <div class="travel-layout">
     <div class="travel-map">
-      <div class="globe-stage">
-        <svg id="travel-globe" viewBox="0 0 720 640" role="img" aria-label="Вращаемый глобус. Выбрать страну также можно кнопками внизу экрана." tabindex="0"></svg>
-        <div class="globe-controls" aria-label="Управление глобусом"><button type="button" data-globe-zoom="1.3" aria-label="Приблизить">+</button><button type="button" data-globe-zoom="0.77" aria-label="Отдалить">−</button><button type="button" id="globe-reset">Сбросить</button></div>
+      <div class="globe-stage" aria-busy="true">
+        <div class="globe-loading" id="globe-loading" role="status">
+          <span class="globe-loading-spinner" aria-hidden="true"></span>
+          <p id="globe-loading-message">Загрузка карты…</p>
+          <a id="globe-loading-fallback" href="/blog/tags/" hidden>Все статьи по странам →</a>
+        </div>
+        <svg id="travel-globe" viewBox="0 0 720 640" role="img" aria-label="Вращаемый глобус. Выбрать страну также можно кнопками внизу экрана." tabindex="-1"></svg>
+        <div class="globe-controls" aria-label="Управление глобусом"><button type="button" data-globe-zoom="1.3" disabled aria-label="Приблизить">+</button><button type="button" data-globe-zoom="0.77" disabled aria-label="Отдалить">−</button><button type="button" id="globe-reset" disabled>Сбросить</button></div>
       </div>
       <p class="globe-help" id="globe-status" role="status">Загрузка глобуса…</p>
       <div class="travel-places" aria-label="Выбрать место">
@@ -21,14 +26,14 @@ permalink: /globe/index.html
         <button type="button" class="place-button" data-place="{{ place.tag }}" data-id="{{ place.id }}" data-lon="{{ place.coordinates[0] }}" data-lat="{{ place.coordinates[1] }}" data-small="{{ place.small or false }}" aria-pressed="false">{{ place.name }} <span>{{ collections[place.tag] | length }}</span></button>
         {% endif %}{% endfor %}
       </div>
-      <noscript><p>Для вращения глобуса включите JavaScript. Все статьи доступны по ссылкам ниже.</p></noscript>
+      <noscript><style>.globe-loading{display:none}</style><p class="globe-noscript">Для вращения глобуса включите JavaScript. <a href="/blog/tags/">Читать статьи по странам →</a></p></noscript>
     </div>
-    <aside class="travel-stories" aria-label="Статьи о выбранном месте">
+    <aside class="travel-stories" aria-label="Статьи о выбранном месте" hidden>
       <button class="travel-close" type="button" aria-label="Закрыть статьи">×</button>
       <div id="travel-empty"><span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Куда отправимся?</h2><p>Выберите место на глобусе или в списке — здесь появятся мои статьи.</p><span class="travel-red-dot"></span> Красным отмечены места, о которых я писал.</div>
       <section id="travel-no-stories" hidden><span class="travel-eyebrow">СТРАНА НА КАРТЕ</span><h2 id="travel-country-name"></h2><p>Пока нет статей об этом месте.</p></section>
       {% for place in travelPlaces %}{% if collections[place.tag] %}
-      <section class="place-stories" data-stories="{{ place.tag }}">
+      <section class="place-stories" data-stories="{{ place.tag }}" hidden>
         <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>{{ place.name }}</h2>
         <a class="travel-all" href="/blog/tags/{{ place.tag }}/" target="_blank" rel="noopener noreferrer">Все статьи: {{ place.name }} →</a>
         <div class="travel-article-list">

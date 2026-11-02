@@ -39,9 +39,14 @@
   <p class="travel-intro">Вращайте глобус, приближайте карту и выбирайте любую страну. Красным отмечены места, где я побывал с обзорными статьями на них.</p>
   <div class="travel-layout">
     <div class="travel-map">
-      <div class="globe-stage">
-        <svg id="travel-globe" viewBox="0 0 720 640" role="img" aria-label="Вращаемый глобус. Выбрать страну также можно кнопками внизу экрана." tabindex="0"></svg>
-        <div class="globe-controls" aria-label="Управление глобусом"><button type="button" data-globe-zoom="1.3" aria-label="Приблизить">+</button><button type="button" data-globe-zoom="0.77" aria-label="Отдалить">−</button><button type="button" id="globe-reset">Сбросить</button></div>
+      <div class="globe-stage" aria-busy="true">
+        <div class="globe-loading" id="globe-loading" role="status">
+          <span class="globe-loading-spinner" aria-hidden="true"></span>
+          <p id="globe-loading-message">Загрузка карты…</p>
+          <a id="globe-loading-fallback" href="/blog/tags/" hidden>Все статьи по странам →</a>
+        </div>
+        <svg id="travel-globe" viewBox="0 0 720 640" role="img" aria-label="Вращаемый глобус. Выбрать страну также можно кнопками внизу экрана." tabindex="-1"></svg>
+        <div class="globe-controls" aria-label="Управление глобусом"><button type="button" data-globe-zoom="1.3" disabled aria-label="Приблизить">+</button><button type="button" data-globe-zoom="0.77" disabled aria-label="Отдалить">−</button><button type="button" id="globe-reset" disabled>Сбросить</button></div>
       </div>
       <p class="globe-help" id="globe-status" role="status">Загрузка глобуса…</p>
       <div class="travel-places" aria-label="Выбрать место">
@@ -57,14 +62,14 @@
         <button type="button" class="place-button" data-place="ge" data-id="268" data-lon="43.5" data-lat="42" data-small="false" aria-pressed="false">Грузия <span>1</span></button>
         
       </div>
-      <noscript><p>Для вращения глобуса включите JavaScript. Все статьи доступны по ссылкам ниже.</p></noscript>
+      <noscript><style>.globe-loading{display:none}</style><p class="globe-noscript">Для вращения глобуса включите JavaScript. <a href="/blog/tags/">Читать статьи по странам →</a></p></noscript>
     </div>
-    <aside class="travel-stories" aria-label="Статьи о выбранном месте">
+    <aside class="travel-stories" aria-label="Статьи о выбранном месте" hidden>
       <button class="travel-close" type="button" aria-label="Закрыть статьи">×</button>
       <div id="travel-empty"><span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Куда отправимся?</h2><p>Выберите место на глобусе или в списке — здесь появятся мои статьи.</p><span class="travel-red-dot"></span> Красным отмечены места, о которых я писал.</div>
       <section id="travel-no-stories" hidden><span class="travel-eyebrow">СТРАНА НА КАРТЕ</span><h2 id="travel-country-name"></h2><p>Пока нет статей об этом месте.</p></section>
       
-      <section class="place-stories" data-stories="cn">
+      <section class="place-stories" data-stories="cn" hidden>
         <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Китай</h2>
         <a class="travel-all" href="/blog/tags/cn/" target="_blank" rel="noopener noreferrer">Все статьи: Китай →</a>
         <div class="travel-article-list">
@@ -82,7 +87,7 @@
         </div>
       </section>
       
-      <section class="place-stories" data-stories="hk">
+      <section class="place-stories" data-stories="hk" hidden>
         <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Гонконг</h2>
         <a class="travel-all" href="/blog/tags/hk/" target="_blank" rel="noopener noreferrer">Все статьи: Гонконг →</a>
         <div class="travel-article-list">
@@ -100,7 +105,7 @@
         </div>
       </section>
       
-      <section class="place-stories" data-stories="mo">
+      <section class="place-stories" data-stories="mo" hidden>
         <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Макао</h2>
         <a class="travel-all" href="/blog/tags/mo/" target="_blank" rel="noopener noreferrer">Все статьи: Макао →</a>
         <div class="travel-article-list">
@@ -113,7 +118,7 @@
         </div>
       </section>
       
-      <section class="place-stories" data-stories="kz">
+      <section class="place-stories" data-stories="kz" hidden>
         <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Казахстан</h2>
         <a class="travel-all" href="/blog/tags/kz/" target="_blank" rel="noopener noreferrer">Все статьи: Казахстан →</a>
         <div class="travel-article-list">
@@ -126,7 +131,7 @@
         </div>
       </section>
       
-      <section class="place-stories" data-stories="ge">
+      <section class="place-stories" data-stories="ge" hidden>
         <span class="travel-eyebrow">ИСТОРИИ ИЗ ПОЕЗДОК</span><h2>Грузия</h2>
         <a class="travel-all" href="/blog/tags/ge/" target="_blank" rel="noopener noreferrer">Все статьи: Грузия →</a>
         <div class="travel-article-list">

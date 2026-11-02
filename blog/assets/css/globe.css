@@ -61,3 +61,14 @@
   .globe-view .travel-stories h2{font-size:24px;margin:8px 0 12px}
   .globe-view .travel-article-list{margin-top:14px;gap:6px}
 }
+
+/* Initial HTML stays usable while deferred scripts and map data load. */
+.globe-loading{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:28px;text-align:center;color:var(--muted);pointer-events:none}
+.globe-loading p{margin:0;font-size:16px}
+.globe-loading a{pointer-events:auto}
+.globe-loading-spinner{width:34px;height:34px;border:3px solid var(--border,#a6b5bd);border-top-color:var(--link,#df514c);border-radius:50%;animation:globe-loading-spin .9s linear infinite}
+.globe-loading[data-state=error] .globe-loading-spinner{display:none}
+.globe-controls button:disabled{opacity:.4;cursor:default}
+.globe-noscript{position:fixed;z-index:2;top:45%;left:16px;right:16px;text-align:center}
+@keyframes globe-loading-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.globe-loading-spinner{animation:none}}

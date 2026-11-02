@@ -7,6 +7,10 @@
   const places = buttons.map(button => ({ tag: button.dataset.place, id: button.dataset.id, name: button.firstChild.textContent.trim(), coords: [+button.dataset.lon, +button.dataset.lat], small: button.dataset.small === 'true', button }));
   const panels = [...document.querySelectorAll('[data-stories]')];
   const status = document.querySelector('#globe-status');
+  const stage = document.querySelector('.globe-stage');
+  const loading = document.querySelector('#globe-loading');
+  const loadingMessage = document.querySelector('#globe-loading-message');
+  const mapControls = [...document.querySelectorAll('.globe-controls button')];
   const stories = document.querySelector('.travel-stories');
   const closeStories = document.querySelector('.travel-close');
   const noStories = document.querySelector('#travel-no-stories');
@@ -216,7 +220,18 @@
       else wake();
     });
     resize();
+    loading.hidden = true;
+    stage.setAttribute('aria-busy','false');
+    element.setAttribute('tabindex','0');
+    mapControls.forEach(button => { button.disabled = false; });
     status.textContent = 'Тяните, чтобы вращать · колёсико или + / − для масштаба · нажмите на любую страну';
   }
-  init().catch(error => { console.error(error); status.textContent = 'Не удалось загрузить глобус. Выберите место кнопками ниже — статьи доступны.'; });
+  init().catch(error => {
+    console.error(error);
+    stage.setAttribute('aria-busy','false');
+    loading.dataset.state = 'error';
+    loadingMessage.textContent = 'Не удалось загрузить карту';
+    document.querySelector('#globe-loading-fallback').hidden = false;
+    status.textContent = 'Выберите место кнопками ниже — статьи доступны.';
+  });
 })();
