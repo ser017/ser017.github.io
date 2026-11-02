@@ -1,7 +1,7 @@
 ---
 title: "Китай"
 date: 2026-10-27
-tags: ["cn","hk"]
+tags: ["cn","hk", "mo"]
 cover: "/assets/images/DJI_20260922111258_0031_D_preview.jpeg"
 hero: true
 author: "Ser017"

@@ -1,0 +1,63 @@
+.travel-tabs{display:flex;gap:8px;margin:12px 0 28px;font-size:15px}
+.travel-tabs a{padding:8px 16px;border-radius:30px;color:var(--muted)}
+.travel-tabs a[aria-current]{background:var(--text);color:var(--card-bg)}
+.travel-page h1{font-size:clamp(32px,4vw,52px);line-height:1.15;margin:0 0 16px;letter-spacing:-1.5px}
+.travel-intro{color:var(--muted);max-width:680px;margin:0 0 28px}
+.travel-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,1fr);gap:28px;align-items:start}
+.travel-map{min-width:0}.globe-stage{position:relative;background:var(--card-bg);border-radius:20px;overflow:hidden;border:1px solid var(--border,#dedee5)}
+#travel-globe{display:block;width:100%;height:auto;touch-action:none;cursor:grab;outline-offset:-4px}
+#travel-globe:active{cursor:grabbing}.globe-ocean{fill:var(--globe-ocean,#e4edf0)}
+.globe-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#travel-globe{position:relative;user-select:none;-webkit-user-select:none}
+#travel-globe.is-dragging,#travel-globe.is-dragging *{cursor:grabbing!important}
+.globe-grid{fill:none;stroke:var(--globe-grid,#ccd9df);stroke-width:.65;pointer-events:none}
+.globe-country{fill:var(--globe-land,#fafbfc);stroke:var(--globe-border,#a6b5bd);stroke-width:.55;stroke-linejoin:round}
+.globe-country.visited{fill:#df514c;cursor:pointer}.globe-country.visited:hover,.globe-country.selected{fill:#ab292c;stroke:#fff;stroke-width:1.4}
+.globe-pin{cursor:pointer}.globe-pin circle{fill:#df514c;stroke:white;stroke-width:2}.globe-pin text{fill:var(--text);font:600 13px system-ui;paint-order:stroke;stroke:var(--card-bg);stroke-width:4px;stroke-linejoin:round}
+.globe-pin.selected circle{fill:#ab292c;stroke-width:3}.globe-pin line{stroke:#df514c;stroke-width:1.5;pointer-events:none}
+.globe-controls{position:absolute;right:16px;bottom:16px;display:flex;gap:6px}
+.globe-controls button,.place-button{font:inherit;color:var(--text);background:var(--card-bg);border:1px solid var(--border,#ddd);cursor:pointer;border-radius:10px;padding:7px 13px}
+.globe-controls button{font-size:15px}.globe-controls button:focus-visible,.place-button:focus-visible{outline:3px solid var(--link);outline-offset:3px}
+.globe-help{color:var(--muted);font-size:13px;margin:12px 0 16px}.travel-places{display:flex;flex-wrap:wrap;gap:8px}
+.place-button{font-size:14px}.place-button:before,.travel-red-dot{content:"";display:inline-block;width:8px;height:8px;background:#df514c;border-radius:50%;margin-right:8px}
+.place-button span{color:var(--muted);margin-left:5px}.place-button[aria-pressed=true]{border-color:#df514c;background:var(--globe-active,#ffefed)}
+.travel-stories{background:var(--card-bg);border:1px solid var(--border,#ddd);border-radius:20px;padding:28px;min-height:290px}
+.travel-eyebrow{font-size:11px;letter-spacing:1.5px;color:var(--muted)}.travel-stories h2{font-size:30px;line-height:1.25;margin:12px 0 18px}.travel-stories p{color:var(--muted);font-size:16px}#travel-empty{font-size:14px;color:var(--muted)}
+.travel-all{font-size:15px}.travel-article-list{display:grid;gap:12px;margin-top:24px}
+.travel-article{display:flex;align-items:center;gap:14px;padding:14px 0;border-top:1px solid var(--border,#ddd);color:var(--text)}
+.travel-article img{width:80px;height:66px;object-fit:cover;border-radius:8px}.travel-article>span:first-of-type{flex:1;min-width:0}.travel-article strong{display:block;font-size:17px;line-height:1.3}.travel-article time{display:block;color:var(--muted);font-size:12px;margin-top:6px}
+.travel-page [hidden]{display:none!important}:root[data-theme=dark]{--globe-ocean:#263d4a;--globe-grid:#375360;--globe-land:#53616a;--globe-border:#87949b;--globe-active:#492b2d}
+@media(max-width:800px){.travel-layout{grid-template-columns:1fr}.travel-stories{padding:22px}.travel-intro{font-size:16px}.travel-tabs{margin-top:0}}
+
+/* The globe is the page; interface panels float above the map. */
+.globe-view{height:100dvh;overflow:hidden}
+.globe-view>.container{max-width:none;padding:0}
+.globe-view .header{position:fixed;z-index:5;top:0;left:0;right:0;margin:0;padding:22px 28px;pointer-events:none;background:linear-gradient(var(--page-bg) 35%,transparent)}
+.globe-view .header a,.globe-view .header button{pointer-events:auto}
+.globe-view .nav,.globe-view .nav .site-about{font-size:14px}
+.globe-view .container>footer,.globe-view .travel-tabs{display:none}
+.globe-view .travel-page h1{position:fixed;z-index:2;top:96px;left:28px;font-size:clamp(26px,3vw,42px);margin:0;pointer-events:none}
+.globe-view .travel-intro{position:fixed;z-index:2;top:150px;left:28px;max-width:350px;font-size:14px;line-height:1.6;pointer-events:none}
+.globe-view .travel-layout,.globe-view .travel-map{display:contents}
+.globe-view .globe-stage{position:fixed;inset:0;border:0;border-radius:0;background:var(--page-bg)}
+.globe-view #travel-globe{width:100%;height:100%;display:block}
+.globe-view .globe-controls{right:28px;bottom:28px;z-index:3}
+.globe-view .globe-help{position:fixed;z-index:2;left:28px;bottom:82px;max-width:calc(100vw - 56px);margin:0;padding:5px 10px;border-radius:8px;background:var(--page-bg);font-size:12px;pointer-events:none}
+.globe-view .travel-places{position:fixed;z-index:3;left:28px;bottom:28px;max-width:calc(100vw - 290px);gap:8px}
+.globe-view .place-button,.globe-view .globe-controls button{box-shadow:var(--shadow)}
+.globe-view .travel-stories{position:fixed;z-index:4;right:28px;top:96px;width:340px;max-width:calc(100vw - 56px);max-height:calc(100dvh - 220px);min-height:0;overflow:auto;box-shadow:0 14px 50px #0002;padding:26px}
+.travel-close{position:absolute;right:12px;top:12px;width:34px;height:34px;border:0;border-radius:50%;background:var(--page-bg);color:var(--text);font-size:25px;line-height:1;cursor:pointer}
+.travel-close:focus-visible{outline:3px solid var(--link);outline-offset:2px}
+.globe-view .travel-stories h2{padding-right:25px}
+@media(max-width:800px){
+  .globe-view .header{padding:18px 16px}
+  .globe-view .travel-page h1{top:94px;left:16px;font-size:28px}
+  .globe-view .travel-intro{top:132px;left:16px;max-width:290px;font-size:12px}
+  .globe-view .travel-places{left:16px;right:16px;bottom:72px;max-width:none;gap:6px}
+  .globe-view .place-button{padding:6px 10px;font-size:12px}
+  .globe-view .globe-controls{right:16px;bottom:16px}
+  .globe-view .globe-help{left:16px;bottom:22px;max-width:calc(100vw - 230px);padding:0;background:none;font-size:10px;line-height:1.4}
+  .globe-view .travel-stories{left:16px;right:16px;top:auto;bottom:164px;width:auto;max-width:none;max-height:42dvh;padding:20px;border-radius:16px}
+  .globe-view .travel-stories h2{font-size:24px;margin:8px 0 12px}
+  .globe-view .travel-article-list{margin-top:14px;gap:6px}
+}
